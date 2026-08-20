@@ -254,6 +254,9 @@ $csrf = generateCSRF();
         <button class="nav-item" onclick="window.location.href='browse_internships.php'">
           <span class="icon"><i class="fas fa-search"></i></span> Browse Internships
         </button>
+        <button class="nav-item" onclick="window.location.href='calendar.php'">
+          <span class="icon"><i class="fas fa-calendar-alt"></i></span> Calendar
+        </button>
         <button class="nav-item" onclick="window.location.href='progress.php'">
           <span class="icon"><i class="fas fa-book"></i></span> Progress Logs
         </button>

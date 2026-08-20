@@ -253,6 +253,9 @@ $db = Database::getConnection();
         <button class="nav-item" onclick="window.location.href='browse_internships.php'">
           <span class="icon"><i class="fas fa-search"></i></span> Browse Internships
         </button>
+        <button class="nav-item" onclick="window.location.href='calendar.php'">
+          <span class="icon"><i class="fas fa-calendar-alt"></i></span> Calendar
+        </button>
         <button class="nav-item" onclick="window.location.href='progress.php'">
           <span class="icon"><i class="fas fa-book"></i></span> Progress Logs
         </button>
@@ -280,9 +283,7 @@ $db = Database::getConnection();
       <header class="page-header">
         <h1 class="page-title"><span>Companies</span></h1>
         <div class="header-actions">
-          <?php if ($user['role'] === 'admin'): ?>
           <button class="add-btn" onclick="document.getElementById('add-modal').classList.add('open')"><i class="fas fa-plus"></i> Add Company</button>
-          <?php endif; ?>
           <?= renderNotifBell($user) ?>
           <button class="icon-btn" onclick="window.location.href='profile.php'" title="Profile"><i class="fas fa-user" style="color:#22C55E;"></i></button>
         </div>

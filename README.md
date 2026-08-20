@@ -33,6 +33,8 @@ A full-stack web application to manage, track, and analyze internship applicatio
    sql/unified_schema.sql
    ```
    This creates the `internship_tracker1` database, all tables, and starter rows.
+   The starter rows ship with **pre-hashed bcrypt passwords**, so the demo
+   accounts in the table below are ready to log in immediately after import.
 4. (Recommended) Load demo data:
    ```bash
    php sql/seed_demo.php
@@ -245,6 +247,21 @@ Reports generated in `./reports/`:
 - **Change accent color**: Edit `--accent` in `css/style.css`
 - **Add new statuses**: Update ENUM in `sql/unified_schema.sql` + add badge class
 - **Add file uploads**: Extend `php/internships.php` using `UPLOAD_DIR` constant
+
+---
+
+## 🛠 Recent Fixes
+
+- **Login for demo accounts**: `sql/unified_schema.sql` ships with valid bcrypt
+  hashes (`Admin@123` / `Student@123`), so accounts work right after import.
+- **Logout button**: added missing `handleLogout()` to `php/admin_internships.php`
+  and fixed a `DivisionByZeroError` in `php/admin_reports.php` (empty report data
+  crashed the page before the logout script rendered). Logout now works on every
+  admin page.
+- **Adding internships**: fixed the column/placeholder mismatch in
+  `php/internships.php` (`createInternship`) that caused a PDO error when saving.
+- **Branding consistency**: login and register pages now use the same neon-green
+  logo, glow effect, and white clipboard icon as the landing page.
 
 ---
 

@@ -216,6 +216,9 @@ $db = Database::getConnection();
         <button class="nav-item" onclick="window.location.href='browse_internships.php'">
           <span class="icon"><i class="fas fa-search"></i></span> Browse Internships
         </button>
+        <button class="nav-item" onclick="window.location.href='calendar.php'">
+          <span class="icon"><i class="fas fa-calendar-alt"></i></span> Calendar
+        </button>
         <button class="nav-item active" onclick="window.location.href='progress.php'">
           <span class="icon"><i class="fas fa-book"></i></span> Progress Logs
         </button>
@@ -243,6 +246,7 @@ $db = Database::getConnection();
       <header class="page-header">
         <h1 class="page-title"><span>Progress Logs</span></h1>
         <div class="header-actions">
+          <button class="add-btn" onclick="openAddInternship()"><i class="fas fa-plus"></i> Add Internship</button>
           <button class="add-btn" onclick="document.getElementById('add-modal').classList.add('open')">+ Add Log</button>
           <?= renderNotifBell($user) ?>
           <button class="icon-btn" onclick="window.location.href='profile.php'" title="Profile"><i class="fas fa-user" style="color:#22C55E;"></i></button>
@@ -384,6 +388,92 @@ $db = Database::getConnection();
         <div class="modal-footer">
           <button type="button" class="btn-secondary" onclick="document.getElementById('add-modal').classList.remove('open')">Cancel</button>
           <button type="submit" class="add-btn">Save Log</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Internship Modal -->
+  <div class="modal-overlay" id="intern-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="intern-modal-title">Add Internship</h2>
+        <button class="modal-close" onclick="closeModal('intern-modal')">×</button>
+      </div>
+      <form id="intern-form" onsubmit="event.preventDefault(); saveInternship();">
+        <input type="hidden" id="intern-id" name="id">
+        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Company</label>
+            <select id="company-select" name="company_id" required>
+              <option value="">Select Company...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Internship Title</label>
+            <input type="text" id="intern-title" name="title" placeholder="e.g. Software Engineering Intern" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Start Date</label>
+              <input type="date" id="intern-start" name="start_date" required>
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="intern-end" name="end_date" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Status</label>
+              <select id="intern-status" name="status" required>
+                <option value="applied">Applied</option>
+                <option value="interview">Interview</option>
+                <option value="accepted">Accepted</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+                <option value="withdrawn">Withdrawn</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Work Mode</label>
+              <select id="intern-workmode" name="work_mode" required>
+                <option value="onsite">Onsite</option>
+                <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Stipend (NPR)</label>
+              <input type="number" id="intern-stipend" name="stipend" min="0" step="0.01" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label>Supervisor Name</label>
+              <input type="text" id="intern-supervisor" name="supervisor_name" placeholder="Optional">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Supervisor Email</label>
+              <input type="email" id="intern-supervisor-email" name="supervisor_email" placeholder="Optional">
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="intern-desc" name="description" placeholder="Optional role description">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="intern-notes" name="notes" rows="3" placeholder="Optional notes"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('intern-modal')">Cancel</button>
+          <button type="submit" class="add-btn">Save Internship</button>
         </div>
       </form>
     </div>

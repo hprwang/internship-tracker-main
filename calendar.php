@@ -12,6 +12,46 @@ if ($user['role'] === 'admin' && !empty($_GET['student_id'])) {
 }
 $events = calendarEvents($filterStudentId ?? (int)$user['id'], $filterStudentId);
 $eventsJson = json_encode($events, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+// Days-in-internship tracker
+$db = Database::getConnection();
+$trackerStmt = $db->prepare("
+    SELECT i.id, i.title, i.start_date, i.end_date, i.status, c.name AS company
+    FROM internships i JOIN companies c ON i.company_id = c.id
+    WHERE i.student_id = ? AND i.status NOT IN ('rejected', 'withdrawn')
+    ORDER BY i.start_date DESC
+");
+$trackerStmt->execute([$filterStudentId ?? (int)$user['id']]);
+$today = new DateTimeImmutable('today');
+$daysTrack = [];
+foreach ($trackerStmt->fetchAll() as $t) {
+    $start = new DateTimeImmutable($t['start_date']);
+    $end   = new DateTimeImmutable($t['end_date']);
+    $totalDays = max(1, (int)$end->diff($start)->days + 1);
+    $elapsed = (int)$today->diff($start)->days + 1;
+    if ($today < $start) {
+        $daysIn = 0;
+        $remaining = (int)$today->diff($start)->days;
+        $state = 'upcoming';
+    } elseif ($today <= $end) {
+        $daysIn = $elapsed;
+        $state = 'ongoing';
+    } else {
+        $daysIn = $totalDays;
+        $state = 'completed';
+    }
+    $daysTrack[] = [
+        'id'          => $t['id'],
+        'title'       => $t['title'],
+        'company'     => $t['company'],
+        'start'       => $t['start_date'],
+        'end'         => $t['end_date'],
+        'total_days'  => $totalDays,
+        'days_in'     => $daysIn,
+        'state'       => $state,
+        'status'      => $t['status'],
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
@@ -82,6 +122,23 @@ $eventsJson = json_encode($events, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS |
     .panel { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.5rem; }
     .panel-title { font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary); }
 
+    /* Days Tracker */
+    .tracker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+    .tracker-card { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.25rem; transition: all var(--transition); }
+    .tracker-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
+    .tracker-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .tracker-title { font-weight: 700; font-size: 1rem; }
+    .tracker-company { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem; }
+    .tracker-state { padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+    .tracker-state.ongoing { background: rgba(34,197,94,0.15); color: var(--green-neon); }
+    .tracker-state.completed { background: rgba(148,163,184,0.15); color: #94A3B8; }
+    .tracker-state.upcoming { background: rgba(59,130,246,0.15); color: #60A5FA; }
+    .tracker-days { font-size: 1.6rem; font-weight: 800; color: var(--green-neon); }
+    .tracker-days small { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+    .tracker-dates { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
+    .tracker-bar { height: 8px; background: var(--bg-card); border-radius: 99px; margin-top: 0.75rem; overflow: hidden; }
+    .tracker-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green-emerald), var(--green-neon)); border-radius: 99px; transition: width 300ms ease; }
+
     @media (max-width: 768px) {
       .dashboard-layout { grid-template-columns: 1fr; }
       .main-content { padding: 1rem; }
@@ -148,6 +205,40 @@ $eventsJson = json_encode($events, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS |
           <button class="icon-btn" style="width:auto;padding:0.45rem 1rem;font-size:0.85rem;" onclick="location.href='calendar.php?student_id=' + encodeURIComponent(document.getElementById('calStudentFilter').value)"><i class="fas fa-filter"></i> Apply</button>
         </div>
       <?php endif; ?>
+
+      <div class="panel" style="margin-bottom:1.5rem;">
+        <div class="panel-title"><i class="fas fa-clock"></i> Days In Internship</div>
+        <?php if (empty($daysTrack)): ?>
+          <p class="page-sub">No internships tracked yet. Add an internship to start counting days.</p>
+        <?php else: ?>
+        <div class="tracker-grid">
+          <?php foreach ($daysTrack as $t):
+              $pct = $t['total_days'] > 0 ? round(($t['days_in'] / $t['total_days']) * 100) : 0;
+              $pct = max(2, min(100, $pct));
+          ?>
+          <div class="tracker-card">
+            <div class="tracker-top">
+              <div>
+                <div class="tracker-title"><?= e($t['title']) ?></div>
+                <div class="tracker-company"><i class="fas fa-building" style="color:var(--green-neon);"></i> <?= e($t['company']) ?></div>
+              </div>
+              <span class="tracker-state <?= $t['state'] ?>"><?= $t['state'] ?></span>
+            </div>
+            <?php if ($t['state'] === 'upcoming'): ?>
+              <div class="tracker-days">Starts in <?= $t['total_days'] > 0 ? (int)$today->diff(new DateTimeImmutable($t['start']))->days : 0 ?>d</div>
+            <?php else: ?>
+              <div class="tracker-days"><?= $t['days_in'] ?> <small>days</small></div>
+            <?php endif; ?>
+            <div class="tracker-bar"><div class="tracker-bar-fill" style="width: <?= $pct ?>%;"></div></div>
+            <div class="tracker-dates">
+              <span><i class="fas fa-flag-checkered"></i> <?= e($t['start']) ?></span>
+              <span><i class="fas fa-flag"></i> <?= e($t['end']) ?></span>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+      </div>
 
       <div class="calendar-layout">
         <div id="calGrid" class="cal-grid"></div>
