@@ -112,8 +112,8 @@ $activeStudents = count(array_filter($students, fn($s) => $s['is_active']));
     .header-actions { display: flex; gap: 0.5rem; }
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all var(--transition); border: none; text-decoration: none; }
-    .btn-primary { background: var(--green-neon); color: var(--bg-deep); }
-    .btn-primary:hover { background: var(--green-glow); box-shadow: 0 0 20px rgba(34,197,94,0.4); }
+    .btn-primary { background: #16a34a; color: #fff; border: 1px solid rgba(34,197,94,0.4); box-shadow: 0 0 12px rgba(34,197,94,0.25); border-radius: 8px; }
+    .btn-primary:hover { background: #15803d; box-shadow: 0 0 16px rgba(34,197,94,0.4); }
     .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
     .btn-secondary:hover { border-color: var(--green-neon); color: var(--green-neon); }
 
@@ -142,6 +142,7 @@ $activeStudents = count(array_filter($students, fn($s) => $s['is_active']));
     .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .pagination-info { font-size: 0.8rem; color: var(--text-muted); }
     .action-btn.toggle { color: var(--green-neon); }
+    .action-btn.toggle.off { color: var(--text-muted); }
     .btn-icon { padding: 0.375rem; font-size: 0.85rem; min-width: 28px; }
 
     .data-table { width: 100%; border-collapse: collapse; }
@@ -212,21 +213,21 @@ $activeStudents = count(array_filter($students, fn($s) => $s['is_active']));
       <div class="stat-card">
 <div class="stat-icon"><i class="fas fa-users"></i></div>
         <div class="stat-info">
-          <div class="stat-value"><?= $totalStudents ?></div>
+          <div class="stat-value" id="total-students"><?= $totalStudents ?></div>
           <div class="stat-label">Total Students</div>
         </div>
       </div>
       <div class="stat-card">
 <div class="stat-icon"><i class="fas fa-check"></i></div>
         <div class="stat-info">
-          <div class="stat-value" style="color:var(--green-neon)"><?= $activeStudents ?></div>
+          <div class="stat-value" id="active-students" style="color:var(--green-neon)"><?= $activeStudents ?></div>
           <div class="stat-label">Active</div>
         </div>
       </div>
       <div class="stat-card">
 <div class="stat-icon"><i class="fas fa-briefcase"></i></div>
         <div class="stat-info">
-          <div class="stat-value"><?= array_sum(array_column($students, 'internship_count')) ?></div>
+          <div class="stat-value" id="total-internships"><?= array_sum(array_column($students, 'internship_count')) ?></div>
           <div class="stat-label">Internships</div>
         </div>
       </div>
@@ -248,18 +249,18 @@ $activeStudents = count(array_filter($students, fn($s) => $s['is_active']));
       <table class="data-table">
         <thead>
           <tr>
-            <th class="sortable" onclick="sortTable('id')">ID</th>
-            <th class="sortable" onclick="sortTable('full_name')">Name</th>
-            <th class="sortable" onclick="sortTable('email')">Email</th>
-            <th class="sortable" onclick="sortTable('internship_count')">Internships</th>
-            <th class="sortable" onclick="sortTable('created_at')">Joined</th>
-            <th class="sortable" onclick="sortTable('is_active')">Status</th>
+            <th class="sortable" data-sort="id" onclick="sortTable('id')">ID</th>
+            <th class="sortable" data-sort="full_name" onclick="sortTable('full_name')">Name</th>
+            <th class="sortable" data-sort="email" onclick="sortTable('email')">Email</th>
+            <th class="sortable" data-sort="internship_count" onclick="sortTable('internship_count')">Internships</th>
+            <th class="sortable" data-sort="created_at" onclick="sortTable('created_at')">Joined</th>
+            <th class="sortable" data-sort="is_active" onclick="sortTable('is_active')">Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="students-tbody">
           <?php if($students): foreach($students as $s): ?>
-          <tr>
+          <tr data-id="<?= $s['id'] ?>">
             <td><?= $s['id'] ?></td>
             <td><?= e($s['full_name']) ?></td>
             <td><?= e($s['email']) ?></td>
@@ -267,7 +268,7 @@ $activeStudents = count(array_filter($students, fn($s) => $s['is_active']));
             <td><?= date('M d, Y', strtotime($s['created_at'])) ?></td>
             <td><span class="status-badge <?= $s['is_active'] ? 'active' : 'inactive' ?>"><?= $s['is_active'] ? 'Active' : 'Inactive' ?></span></td>
             <td>
-              <button class="btn btn-secondary action-btn btn-icon" onclick="toggleStatus(<?= $s['id'] ?>, <?= $s['is_active'] ?>)" title="<?= $s['is_active'] ? 'Deactivate' : 'Activate' ?>"><?= $s['is_active'] ? '◉' : '○' ?></button>
+              <button class="btn btn-secondary action-btn btn-icon toggle<?= $s['is_active'] ? '' : ' off' ?>" onclick="toggleStatus(<?= $s['id'] ?>, <?= $s['is_active'] ?>)" title="<?= $s['is_active'] ? 'Deactivate' : 'Activate' ?>"><?= $s['is_active'] ? '<i class="fas fa-toggle-on"></i>' : '<i class="fas fa-toggle-off"></i>' ?></button>
               <button class="btn btn-secondary action-btn" onclick="editStudent(<?= $s['id'] ?>, '<?= e(addslashes($s['full_name'])) ?>', '<?= e(addslashes($s['email'])) ?>', '<?= e(addslashes($s['username'])) ?>')">Edit</button>
               <button class="btn btn-secondary action-btn" onclick="deleteStudent(<?= $s['id'] ?>)">Delete</button>
             </td>
@@ -278,7 +279,7 @@ $activeStudents = count(array_filter($students, fn($s) => $s['is_active']));
         </tbody>
       </table>
       </div>
-      <div class="pagination">
+      <div class="pagination" id="pagination-bar">
         <button class="pagination-btn" id="prev-btn" onclick="changePage(-1)">← Prev</button>
         <span class="pagination-info" id="page-info"></span>
         <button class="pagination-btn" id="next-btn" onclick="changePage(1)">Next →</button>
@@ -320,6 +321,13 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeModal();
 });
 
+function updateStats() {
+  const all = App.students;
+  document.getElementById('total-students').textContent = all.length;
+  document.getElementById('active-students').textContent = all.filter(s => s.is_active).length;
+  document.getElementById('total-internships').textContent = all.reduce((n, s) => n + (s.internship_count || 0), 0);
+}
+
 function renderTable() {
   let data = [...App.students];
   const query = document.getElementById('search-input').value.toLowerCase();
@@ -344,6 +352,9 @@ function renderTable() {
   const start = (currentPage - 1) * perPage;
   const pageData = data.slice(start, start + perPage);
 
+  const pagination = document.getElementById('pagination-bar');
+  if (pagination) pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+
   document.getElementById('student-count').textContent = data.length;
   document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
   document.getElementById('prev-btn').disabled = currentPage === 1;
@@ -356,7 +367,7 @@ function renderTable() {
   }
 
   tbody.innerHTML = pageData.map(s => `
-    <tr>
+    <tr data-id="${s.id}">
       <td>${s.id}</td>
       <td>${s.full_name}</td>
       <td>${s.email}</td>
@@ -364,7 +375,7 @@ function renderTable() {
       <td>${new Date(s.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</td>
       <td><span class="status-badge ${s.is_active ? 'active' : 'inactive'}">${s.is_active ? 'Active' : 'Inactive'}</span></td>
       <td>
-        <button class="btn btn-secondary action-btn btn-icon" onclick="toggleStatus(${s.id}, ${s.is_active})" title="${s.is_active ? 'Deactivate' : 'Activate'}">${s.is_active ? '◉' : '○'}</button>
+        <button class="btn btn-secondary action-btn btn-icon toggle${s.is_active ? '' : ' off'}" onclick="toggleStatus(${s.id}, ${s.is_active})" title="${s.is_active ? 'Deactivate' : 'Activate'}">${s.is_active ? '<i class="fas fa-toggle-on"></i>' : '<i class="fas fa-toggle-off"></i>'}</button>
         <button class="btn btn-secondary action-btn" onclick="editStudent(${s.id}, '${s.full_name.replace(/'/g, "\\'")}', '${s.email.replace(/'/g, "\\'")}', '${s.username.replace(/'/g, "\\'")}')">Edit</button>
         <button class="btn btn-secondary action-btn" onclick="deleteStudent(${s.id})">Delete</button>
       </td>
@@ -373,7 +384,7 @@ function renderTable() {
 
   document.querySelectorAll('th.sortable').forEach(th => {
     th.classList.remove('sorted-asc', 'sorted-desc');
-    if (th.onclick?.toString().includes(sortCol)) {
+    if (th.dataset.sort === sortCol) {
       th.classList.add('sorted-' + sortDir);
     }
   });
@@ -423,12 +434,46 @@ function toggleStatus(id, currentStatus) {
     .then(r => r.json())
     .then(data => {
       toast(data.message, data.success ? 'success' : 'error');
-      if (data.success) {
-        const s = App.students.find(x => x.id === id);
-        if (s) s.is_active = currentStatus ? 0 : 1;
+      if (!data.success) return;
+
+      const s = App.students.find(x => x.id === id);
+      if (!s) return;
+      s.is_active = currentStatus ? 0 : 1;
+      updateStats();
+
+      // If an active status filter would now exclude/include this row,
+      // the row set itself has changed and needs a real re-render.
+      // Otherwise, patch just this row so sort order, other rows' state,
+      // and the header row are left completely untouched.
+      const statusFilter = document.getElementById('status-filter').value;
+      if (statusFilter !== '' && String(s.is_active) !== statusFilter) {
         renderTable();
+        return;
       }
+      patchRow(s);
     });
+}
+
+// Updates a single row's status badge and toggle button in place,
+// without rebuilding the tbody — so row order, other rows, and the
+// sort-column header highlight are never touched by a status toggle.
+function patchRow(s) {
+  const row = document.querySelector(`tr[data-id="${s.id}"]`);
+  if (!row) return;
+
+  const badge = row.querySelector('.status-badge');
+  if (badge) {
+    badge.className = 'status-badge ' + (s.is_active ? 'active' : 'inactive');
+    badge.textContent = s.is_active ? 'Active' : 'Inactive';
+  }
+
+  const toggleBtn = row.querySelector('.action-btn.toggle');
+  if (toggleBtn) {
+    toggleBtn.className = 'btn btn-secondary action-btn btn-icon toggle' + (s.is_active ? '' : ' off');
+    toggleBtn.title = s.is_active ? 'Deactivate' : 'Activate';
+    toggleBtn.innerHTML = s.is_active ? '<i class="fas fa-toggle-on"></i>' : '<i class="fas fa-toggle-off"></i>';
+    toggleBtn.setAttribute('onclick', `toggleStatus(${s.id}, ${s.is_active})`);
+  }
 }
 
 document.getElementById('modal-form').addEventListener('submit', async e => {
@@ -476,6 +521,7 @@ function deleteStudent(id) {
         if (data.success) {
           App.students = App.students.filter(s => s.id !== id);
           renderTable();
+          updateStats();
         }
       });
   }

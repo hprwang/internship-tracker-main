@@ -104,13 +104,13 @@ $settings = array_merge($defaults, $settings);
     .page-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all var(--transition); border: none; text-decoration: none; }
-    .btn-primary { background: linear-gradient(135deg, #22C55E, #16A34A); color: #0a0f0d; font-weight: 700; border-radius: 8px; box-shadow: 0 0 14px rgba(34,197,94,0.25); }
-    .btn-primary:hover { background: linear-gradient(135deg, #34D972, #22C55E); box-shadow: 0 0 24px rgba(34,197,94,0.45); transform: translateY(-1px); }
+    .btn-primary { background: #16a34a; color: #fff; border: 1px solid rgba(34,197,94,0.4); box-shadow: 0 0 12px rgba(34,197,94,0.25); border-radius: 8px; }
+    .btn-primary:hover { background: #15803d; box-shadow: 0 0 16px rgba(34,197,94,0.4); }
     .btn-primary:active { transform: translateY(0); box-shadow: 0 0 10px rgba(34,197,94,0.2); }
     .btn-primary:disabled, .btn-primary[disabled] { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border-subtle); box-shadow: none; transform: none; cursor: not-allowed; opacity: 0.75; }
     .btn-primary.pulse { animation: pulseGlow 1.6s ease-in-out infinite; }
-    @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 14px rgba(34,197,94,0.25); } 50% { box-shadow: 0 0 26px rgba(34,197,94,0.5); } }
-    .btn-primary .btn-spinner { display: none; width: 14px; height: 14px; border: 2px solid rgba(10,15,13,0.3); border-top-color: #0a0f0d; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 12px rgba(34,197,94,0.25); } 50% { box-shadow: 0 0 26px rgba(34,197,94,0.5); } }
+    .btn-primary .btn-spinner { display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
     .btn-primary.saving .btn-spinner { display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); }

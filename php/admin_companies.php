@@ -26,10 +26,16 @@ if ($industryFilter) $where[] = "c.industry = " . $companyDb->quote($industryFil
 if ($statusFilter) $where[] = "c.status = " . $companyDb->quote($statusFilter);
 $whereClause = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
+$allowedSort = ['id' => 'c.id', 'name' => 'c.name', 'industry' => 'c.industry', 'location' => 'c.location', 'status' => 'c.status', 'internship_count' => 'internship_count'];
+$sortCol = isset($_GET['sort']) && isset($allowedSort[$_GET['sort']]) ? $_GET['sort'] : 'id';
+$sortDir = (($_GET['dir'] ?? 'desc') === 'asc') ? 'ASC' : 'DESC';
+$orderBy = $allowedSort[$sortCol] . ' ' . $sortDir;
+$sortDirIcon = $sortDir === 'ASC' ? '↑' : '↓';
+
 $companies = $companyDb->query("
     SELECT c.*,
            (SELECT COUNT(*) FROM company_internships WHERE company_id = c.id) as internship_count
-    FROM companies c $whereClause ORDER BY c.created_at DESC
+    FROM companies c $whereClause ORDER BY $orderBy
 ")->fetchAll();
 
 $totalCompanies = count($companies);
@@ -56,17 +62,29 @@ $industries = array_column($allIndustries, 'industry');
   <style>
     #modal { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.75); align-items: center; justify-content: center; padding: 1rem; max-width: none !important; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.25s ease; }
     #modal.show { display: flex; opacity: 1; }
-    #modal .modal-content { background: #131313; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 32px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(34,197,94,0.06); transform: translateY(20px) scale(0.97); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    #modal .modal-content { display: flex; flex-direction: column; background: #131313; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; max-width: 500px; width: 100%; max-height: 85vh; overflow: hidden; box-shadow: 0 32px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(34,197,94,0.06); transform: translateY(20px) scale(0.97); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     #modal.show .modal-content { transform: translateY(0) scale(1); }
-    #modal .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #222; background: #161616; border-radius: 16px 16px 0 0; position: sticky; top: 0; z-index: 1; }
+    #modal .modal-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #222; background: #161616; border-radius: 16px 16px 0 0; }
     #modal .modal-title { font-size: 1.05rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
     #modal .modal-close { width: 32px; height: 32px; border: none; background: rgba(255,255,255,0.06); color: #888; border-radius: 8px; cursor: pointer; font-size: 1.25rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
     #modal .modal-close:hover { background: rgba(239,68,68,0.2); color: #f87171; transform: rotate(90deg); }
+    #modal .modal-content form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+    #modal .modal-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 1.25rem 1.5rem; }
+    #modal .modal-body::-webkit-scrollbar { width: 8px; }
+    #modal .modal-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 8px; }
     #modal .form-group { margin-bottom: 1rem; }
-    #modal .form-label { display: block; font-size: .78rem; font-weight: 500; color: #a1a1aa; margin-bottom: .35rem; letter-spacing: 0.02em; }
+    #modal .form-label { display: block; font-size: .78rem; font-weight: 500; color: #c2c2cc; margin-bottom: .35rem; letter-spacing: 0.02em; }
+    #modal .req { color: #f87171; margin-left: 2px; }
+    #modal .opt { font-weight: 400; font-size: .68rem; color: #71717a; text-transform: none; letter-spacing: 0; margin-left: 4px; }
     #modal .form-control { width: 100%; padding: .6rem .85rem; background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 10px; color: #fff; font-size: .85rem; transition: border-color 0.2s; }
+    #modal .form-control::placeholder { color: #52525b; }
     #modal .form-control:focus { outline: none; border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.1); }
-    #modal .modal-actions { display: flex; gap: .5rem; justify-content: flex-end; padding: 1rem 1.5rem; border-top: 1px solid #222; background: rgba(0,0,0,0.15); border-radius: 0 0 16px 16px; margin-top: 0; }
+    #modal .form-control.invalid { border-color: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,0.12); }
+    #modal .select-wrap { position: relative; }
+    #modal .select-wrap::after { content: '\f078'; font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: #71717a; pointer-events: none; font-size: 0.7rem; }
+    #modal .select-wrap select { appearance: none; -webkit-appearance: none; -moz-appearance: none; padding-right: 2.5rem; cursor: pointer; }
+    #modal textarea.form-control { resize: none; }
+    #modal .modal-actions { flex-shrink: 0; display: flex; gap: .5rem; justify-content: flex-end; padding: 1rem 1.5rem; border-top: 1px solid #222; background: rgba(0,0,0,0.15); border-radius: 0 0 16px 16px; margin-top: 0; }
   </style>
   <style>
     :root {
@@ -126,8 +144,8 @@ $industries = array_column($allIndustries, 'industry');
     .header-actions { display: flex; gap: 0.5rem; }
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all var(--transition); border: none; text-decoration: none; }
-    .btn-primary { background: var(--green-neon); color: var(--bg-deep); }
-    .btn-primary:hover { background: var(--green-glow); box-shadow: 0 0 20px rgba(34,197,94,0.4); }
+    .btn-primary { background: #16a34a; color: #fff; border: 1px solid rgba(34,197,94,0.4); box-shadow: 0 0 12px rgba(34,197,94,0.25); border-radius: 8px; }
+    .btn-primary:hover { background: #15803d; box-shadow: 0 0 16px rgba(34,197,94,0.4); }
     .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
     .btn-secondary:hover { border-color: var(--green-neon); color: var(--green-neon); }
 
@@ -143,6 +161,7 @@ $industries = array_column($allIndustries, 'industry');
     .card-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
     .card-title { font-size: 0.95rem; font-weight: 600; }
     .search-input { padding: 0.5rem 0.75rem; background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.85rem; width: 200px; }
+    .search-input::placeholder { color: var(--text-muted); }
     .search-input:focus { outline: none; border-color: var(--green-neon); }
 
     .data-table { width: 100%; border-collapse: collapse; }
@@ -152,6 +171,10 @@ $industries = array_column($allIndustries, 'industry');
     .data-table tr:hover td { background: var(--bg-elevated); }
     .company-name { font-weight: 600; color: var(--text-primary); }
     .company-industry { color: var(--text-muted); font-size: 0.8rem; }
+    .contact-email { color: var(--text-secondary); }
+    .contact-phone { color: var(--text-muted); font-size: 0.75rem; }
+    .contact-warning { display: inline-flex; align-items: center; gap: 0.35rem; color: #FBBF24; font-size: 0.72rem; font-weight: 500; }
+    .contact-warning i { font-size: 0.8rem; }
     .status-badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
     .status-badge.active { background: rgba(34,197,94,0.15); color: var(--green-neon); }
     .status-badge.inactive { background: rgba(248,113,113,0.15); color: #F87171; }
@@ -162,7 +185,9 @@ $industries = array_column($allIndustries, 'industry');
     .th-sortable { cursor: pointer; user-select: none; }
     .th-sortable:hover { color: var(--green-neon); }
     .sort-icon { opacity: 0.5; margin-left: 0.25rem; }
+    .th-sortable.sorted { color: var(--green-neon); }
     .th-sortable.sorted .sort-icon { opacity: 1; color: var(--green-neon); }
+    .count-zero { color: var(--text-muted); }
 
     .action-btn { padding: 0.375rem 0.625rem; font-size: 0.75rem; border-radius: var(--radius-sm); margin-right: 0.25rem; }
     .empty-message { padding: 2.5rem; text-align: center; color: var(--text-muted); }
@@ -196,21 +221,46 @@ $industries = array_column($allIndustries, 'industry');
     </div>
     <form id="modal-form">
       <input type="hidden" name="id" id="company-id" value="">
-      <div class="form-group"><label class="form-label">Company Name</label><input type="text" name="name" id="company-name" class="form-control" required></div>
-      <div class="form-group"><label class="form-label">Industry</label><input type="text" name="industry" id="company-industry" class="form-control" list="industry-list"></div>
-      <datalist id="industry-list"><?php foreach($industries as $ind): ?><option value="<?= e($ind) ?>"><?php endforeach; ?></datalist>
-      <div class="form-group"><label class="form-label">Website</label><input type="url" name="website" id="company-website" class="form-control"></div>
-      <div class="form-group"><label class="form-label">Location</label><input type="text" name="location" id="company-location" class="form-control"></div>
-      <div class="form-group"><label class="form-label">Email</label><input type="email" name="email" id="company-email" class="form-control"></div>
-      <div class="form-group"><label class="form-label">Phone</label><input type="text" name="phone" id="company-phone" class="form-control"></div>
-      <div class="form-group"><label class="form-label">Description</label><textarea name="description" id="company-description" class="form-control" rows="2"></textarea></div>
-      <div class="form-group">
-        <label class="form-label">Status</label>
-        <select name="status" id="company-status" class="form-control">
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="pending">Pending</option>
-        </select>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="company-name">Company Name <span class="req">*</span></label>
+          <input type="text" name="name" id="company-name" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="company-industry">Industry <span class="opt">optional</span></label>
+          <input type="text" name="industry" id="company-industry" class="form-control" list="industry-list">
+        </div>
+        <datalist id="industry-list"><?php foreach($industries as $ind): ?><option value="<?= e($ind) ?>"><?php endforeach; ?></datalist>
+        <div class="form-group">
+          <label class="form-label" for="company-website">Website <span class="opt">optional</span></label>
+          <input type="url" name="website" id="company-website" class="form-control" placeholder="https://example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="company-location">Location <span class="opt">optional</span></label>
+          <input type="text" name="location" id="company-location" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="company-email">Email <span class="opt">optional</span></label>
+          <input type="email" name="email" id="company-email" class="form-control" placeholder="contact@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="company-phone">Phone <span class="opt">optional</span></label>
+          <input type="tel" name="phone" id="company-phone" class="form-control" placeholder="98XXXXXXXX" title="e.g. 9841234567">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="company-description">Description <span class="opt">optional</span></label>
+          <textarea name="description" id="company-description" class="form-control" rows="2" placeholder="Company overview, services, focus areas..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="company-status">Status</label>
+          <div class="select-wrap">
+            <select name="status" id="company-status" class="form-control">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -290,13 +340,13 @@ $industries = array_column($allIndustries, 'industry');
       <table class="data-table" id="companies-table">
         <thead>
           <tr>
-            <th class="th-sortable" onclick="sortTable('id')">ID <span class="sort-icon">↕</span></th>
-            <th class="th-sortable" onclick="sortTable('name')">Company <span class="sort-icon">↕</span></th>
-            <th class="th-sortable" onclick="sortTable('industry')">Industry <span class="sort-icon">↕</span></th>
-            <th class="th-sortable" onclick="sortTable('location')">Location <span class="sort-icon">↕</span></th>
+            <th class="th-sortable<?= $sortCol === 'id' ? ' sorted' : '' ?>" onclick="sortTable('id')">ID <span class="sort-icon"><?= $sortCol === 'id' ? $sortDirIcon : '↕' ?></span></th>
+            <th class="th-sortable<?= $sortCol === 'name' ? ' sorted' : '' ?>" onclick="sortTable('name')">Company <span class="sort-icon"><?= $sortCol === 'name' ? $sortDirIcon : '↕' ?></span></th>
+            <th class="th-sortable<?= $sortCol === 'industry' ? ' sorted' : '' ?>" onclick="sortTable('industry')">Industry <span class="sort-icon"><?= $sortCol === 'industry' ? $sortDirIcon : '↕' ?></span></th>
+            <th class="th-sortable<?= $sortCol === 'location' ? ' sorted' : '' ?>" onclick="sortTable('location')">Location <span class="sort-icon"><?= $sortCol === 'location' ? $sortDirIcon : '↕' ?></span></th>
             <th>Email / Phone</th>
-            <th class="th-sortable" onclick="sortTable('internship_count')">Internships <span class="sort-icon">↕</span></th>
-            <th class="th-sortable" onclick="sortTable('status')">Status <span class="sort-icon">↕</span></th>
+            <th class="th-sortable<?= $sortCol === 'internship_count' ? ' sorted' : '' ?>" onclick="sortTable('internship_count')">Internships <span class="sort-icon"><?= $sortCol === 'internship_count' ? $sortDirIcon : '↕' ?></span></th>
+            <th class="th-sortable<?= $sortCol === 'status' ? ' sorted' : '' ?>" onclick="sortTable('status')">Status <span class="sort-icon"><?= $sortCol === 'status' ? $sortDirIcon : '↕' ?></span></th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -324,10 +374,14 @@ $industries = array_column($allIndustries, 'industry');
             <td><?= e($c['industry'] ?? '-') ?></td>
             <td><?= e($c['location'] ?? '-') ?></td>
             <td>
-              <span class="contact-email"><?= e($c['email'] ?? '-') ?></span><br>
-              <small class="contact-phone"><?= e($c['phone'] ?? '') ?></small>
+              <?php if (!empty($c['email']) || !empty($c['phone'])): ?>
+                <span class="contact-email"><?= e($c['email'] ?? '-') ?></span><br>
+                <small class="contact-phone"><?= e($c['phone'] ?? '') ?></small>
+              <?php else: ?>
+                <span class="contact-warning" title="No contact email or phone on file"><i class="fas fa-exclamation-triangle"></i> No contact info</span>
+              <?php endif; ?>
             </td>
-            <td><?= $c['internship_count'] ?></td>
+            <td><?= $c['internship_count'] > 0 ? $c['internship_count'] : '<span class="count-zero">0</span>' ?></td>
             <td><span class="status-badge <?= e($status) ?>"><?= e($status) ?></span></td>
             <td>
               <button class="btn btn-secondary action-btn" onclick='editCompany(<?= e(json_encode($c, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)) ?>)'>Edit</button>
@@ -344,7 +398,7 @@ $industries = array_column($allIndustries, 'industry');
 </div>
 
 <script>
-const App = { csrfToken: '<?= $csrf ?>', sortCol: null, sortDir: 'asc' };
+const App = { csrfToken: '<?= $csrf ?>', sortCol: '<?= e($sortCol) ?>', sortDir: '<?= $sortDir === 'ASC' ? 'asc' : 'desc' ?>' };
 
 function toast(msg, type = 'info') {
   const c = document.getElementById('toast-container');
@@ -355,18 +409,46 @@ function toast(msg, type = 'info') {
   setTimeout(() => el.remove(), 4000);
 }
 
+let _formSnapshot = null;
+let _dirty = false;
+
+function getFormValues() {
+  const f = document.getElementById('modal-form');
+  return {
+    name: (f.name.value || '').trim(),
+    industry: (f.industry.value || '').trim(),
+    website: (f.website.value || '').trim(),
+    location: (f.location.value || '').trim(),
+    email: (f.email.value || '').trim(),
+    phone: (f.phone.value || '').trim(),
+    description: (f.description.value || '').trim(),
+    status: f.status.value
+  };
+}
+
+function updateDirty() {
+  if (!_formSnapshot) { _dirty = false; return; }
+  const v = getFormValues();
+  _dirty = Object.keys(_formSnapshot).some(k => (v[k] || '') !== (_formSnapshot[k] || ''));
+}
+
 function openModal(isEdit = false) {
   document.getElementById('modal-title').textContent = isEdit ? 'Edit Company' : 'Add Company';
   document.getElementById('modal-submit').textContent = isEdit ? 'Update' : 'Save';
   document.getElementById('modal').classList.add('show');
   document.body.style.overflow = 'hidden';
+  _formSnapshot = getFormValues();
+  _dirty = false;
 }
 
-function closeModal() {
+function closeModal(force = false) {
+  if (!force && _dirty && !confirm('You have unsaved changes. Discard them?')) return;
   document.getElementById('modal').classList.remove('show');
+  document.body.style.overflow = '';
   document.getElementById('modal-form').reset();
   document.getElementById('company-id').value = '';
-  document.body.style.overflow = '';
+  _formSnapshot = null;
+  _dirty = false;
 }
 
 // Backdrop click to close
@@ -377,6 +459,24 @@ document.getElementById('modal').addEventListener('click', function(e) {
 // Escape key to close
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeModal();
+});
+
+document.getElementById('modal-form').addEventListener('input', updateDirty);
+document.getElementById('modal-form').addEventListener('change', updateDirty);
+
+function validateForm() {
+  const name = document.getElementById('company-name');
+  const fields = [name];
+  let valid = true;
+  fields.forEach(f => {
+    if (f && !f.value.trim()) { f.classList.add('invalid'); valid = false; } else if (f) { f.classList.remove('invalid'); }
+  });
+  if (!valid) name.focus();
+  return valid;
+}
+
+document.querySelectorAll('#modal .form-control').forEach(el => {
+  el.addEventListener('input', () => el.classList.remove('invalid'));
 });
 
 function filterTable(query) {
@@ -395,6 +495,8 @@ function applyFilters() {
   const params = new URLSearchParams();
   if (industry) params.set('industry', industry);
   if (status) params.set('status', status);
+  if (App.sortCol) params.set('sort', App.sortCol);
+  if (App.sortDir) params.set('dir', App.sortDir);
   window.location.search = params.toString() || '?';
 }
 
@@ -404,8 +506,13 @@ function sortTable(col) {
   if (App.sortCol === col) App.sortDir = App.sortDir === 'asc' ? 'desc' : 'asc';
   else { App.sortCol = col; App.sortDir = 'asc'; }
 
-  document.querySelectorAll('.th-sortable').forEach(th => th.classList.remove('sorted'));
-  document.querySelector(`.th-sortable[onclick="sortTable('${col}')"]`)?.classList.add('sorted');
+  document.querySelectorAll('.th-sortable').forEach(th => {
+    th.classList.remove('sorted');
+    th.querySelector('.sort-icon').textContent = '↕';
+  });
+  const active = document.querySelector(`.th-sortable[onclick="sortTable('${col}')"]`);
+  active.classList.add('sorted');
+  active.querySelector('.sort-icon').textContent = App.sortDir === 'asc' ? '↑' : '↓';
 
   rows.sort((a, b) => {
     let av = a.getAttribute('data-' + col) || a.cells[col === 'internship_count' ? 5 : col === 'name' ? 1 : col === 'industry' ? 2 : col === 'location' ? 3 : col === 'status' ? 6 : 0].textContent;
@@ -415,6 +522,11 @@ function sortTable(col) {
     return App.sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
   });
   rows.forEach(r => tbody.appendChild(r));
+
+  const params = new URLSearchParams(window.location.search);
+  params.set('sort', col);
+  params.set('dir', App.sortDir);
+  history.replaceState(null, '', window.location.pathname + '?' + params.toString());
 }
 
 function exportCSV() {
@@ -444,6 +556,11 @@ function exportCSV() {
 
 document.getElementById('modal-form').addEventListener('submit', async e => {
   e.preventDefault();
+  if (!validateForm()) return;
+  const submitBtn = document.getElementById('modal-submit');
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
   const fd = new FormData(e.target);
   const id = fd.get('id');
   fd.append('action', id ? 'update_company' : 'add_company');
@@ -454,13 +571,17 @@ document.getElementById('modal-form').addEventListener('submit', async e => {
     const data = await res.json();
     if (data.success) {
       toast(data.message, 'success');
-      closeModal();
+      closeModal(true);
       setTimeout(() => location.reload(), 500);
     } else {
       toast(data.message, 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
     }
   } catch(err) {
     toast('Error: ' + err.message, 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
   }
 });
 

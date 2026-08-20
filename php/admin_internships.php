@@ -201,8 +201,8 @@ function fmtStipend($v): string {
     .toast.success { border-color: var(--green-neon); } .toast.error { border-color: #F87171; }
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-    .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); color: #050505; font-weight: 700; padding: 0.65rem 1.25rem; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.85rem; transition: all var(--transition); }
-    .btn-primary:hover { box-shadow: 0 0 25px rgba(34,197,94,0.4); transform: translateY(-1px); }
+    .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; background: #16a34a; color: #fff; font-weight: 700; padding: 0.65rem 1.25rem; border: 1px solid rgba(34,197,94,0.4); border-radius: 8px; box-shadow: 0 0 12px rgba(34,197,94,0.25); cursor: pointer; font-size: 0.85rem; transition: all var(--transition); }
+    .btn-primary:hover { background: #15803d; box-shadow: 0 0 16px rgba(34,197,94,0.4); }
     .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
     .btn-secondary { background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 0.65rem 1.25rem; border-radius: var(--radius-md); cursor: pointer; font-weight: 600; font-size: 0.85rem; }
     .btn-secondary:hover { border-color: var(--border-light); color: var(--text-primary); }

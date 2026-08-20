@@ -137,8 +137,8 @@ $recentInternships = $db->query("
     .header-actions { display: flex; gap: 0.5rem; }
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.625rem 1.25rem; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all var(--transition); border: none; text-decoration: none; letter-spacing: -0.01em; }
-    .btn-primary { background: var(--green-neon); color: var(--bg-deep); }
-    .btn-primary:hover { background: var(--green-glow); box-shadow: 0 4px 16px rgba(34,197,94,0.35); transform: translateY(-1px); }
+    .btn-primary { background: #16a34a; color: #fff; border: 1px solid rgba(34,197,94,0.4); box-shadow: 0 0 12px rgba(34,197,94,0.25); border-radius: 8px; }
+    .btn-primary:hover { background: #15803d; box-shadow: 0 0 16px rgba(34,197,94,0.4); }
     .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
     .btn-secondary:hover { border-color: var(--green-neon); color: var(--green-neon); background: rgba(34,197,94,0.08); }
     .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }

@@ -122,8 +122,8 @@ $todayLogs = count(array_filter($activities, fn($a) => substr($a['created_at'] ?
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all var(--transition); border: 1px solid var(--border-subtle); background: var(--bg-card); color: var(--text-secondary); text-decoration: none; }
     .btn:hover { border-color: var(--green-neon); color: var(--green-neon); }
-    .btn-primary { background: var(--green-neon); color: var(--bg-deep); border: none; }
-    .btn-primary:hover { background: var(--green-glow); color: var(--bg-deep); box-shadow: 0 0 20px rgba(34,197,94,0.4); }
+    .btn-primary { background: #16a34a; color: #fff; border: 1px solid rgba(34,197,94,0.4); box-shadow: 0 0 12px rgba(34,197,94,0.25); border-radius: 8px; }
+    .btn-primary:hover { background: #15803d; box-shadow: 0 0 16px rgba(34,197,94,0.4); }
 
     .toast-container { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; }
     .toast { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); animation: slideIn 0.3s ease; font-size: 0.85rem; }
