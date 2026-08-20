@@ -27,7 +27,7 @@ require_once 'php/config.php';
       --neon-green-subtle: rgba(0, 255, 102, 0.08);
       --text-primary: #ffffff;
       --text-secondary: #a8aba6;
-      --text-muted: #6b706b;
+      --text-muted: #7e847e;
       --border: #2a2f2b;
       --border-glow: rgba(0, 255, 102, 0.3);
     }
@@ -104,6 +104,12 @@ require_once 'php/config.php';
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid rgba(0, 255, 102, 0.08);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .navbar.scrolled {
+      background: rgba(11, 15, 12, 0.96);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
     }
 
     .navbar-logo {
@@ -176,6 +182,16 @@ require_once 'php/config.php';
       border: 1px solid var(--neon-green);
       border-radius: 8px;
       color: var(--neon-green);
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      transition: opacity 0.35s ease, transform 0.35s ease, background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .navbar.scrolled .nav-link.btn-login {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
     }
 
     .nav-link.btn-login:hover {
@@ -188,6 +204,12 @@ require_once 'php/config.php';
       display: none;
     }
 
+    a:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--neon-green);
+      outline-offset: 3px;
+    }
+
     /* Hero Section */
     .hero {
       min-height: 100vh;
@@ -195,10 +217,24 @@ require_once 'php/config.php';
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 8rem 3rem 5rem;
+      padding: 7rem 3rem 6rem;
       text-align: center;
       position: relative;
       z-index: 1;
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 85%;
+      max-width: 1000px;
+      height: 75%;
+      background: radial-gradient(ellipse 55% 50% at 50% 45%, rgba(0, 255, 102, 0.10), transparent 68%);
+      filter: blur(70px);
+      z-index: -1;
+      pointer-events: none;
     }
 
     .hero-bg {
@@ -283,7 +319,6 @@ require_once 'php/config.php';
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      filter: drop-shadow(0 0 30px var(--neon-green-glow));
     }
 
     .hero-subtitle {
@@ -345,22 +380,167 @@ require_once 'php/config.php';
       color: var(--neon-green);
     }
 
+    /* Hero dashboard mockup */
+    .hero-mockup {
+      width: 100%;
+      max-width: 800px;
+      margin: 3.5rem auto 0;
+      background: linear-gradient(160deg, rgba(21, 25, 21, 0.92), rgba(17, 22, 18, 0.96));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      text-align: left;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5), 0 0 60px var(--neon-green-subtle);
+      animation: fadeInUp 0.9s ease 0.8s both;
+    }
+
+    .mockup-topbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.9rem 1.25rem;
+      background: rgba(11, 15, 12, 0.6);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mockup-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .mockup-dot:nth-child(1) { background: #ff5f57; }
+    .mockup-dot:nth-child(2) { background: #febc2e; }
+    .mockup-dot:nth-child(3) { background: #28c840; }
+
+    .mockup-url {
+      margin-left: 0.75rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.25rem 0.9rem;
+    }
+
+    .mockup-body {
+      display: flex;
+      min-height: 260px;
+    }
+
+    .mockup-sidebar {
+      width: 92px;
+      padding: 1rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      border-right: 1px solid var(--border);
+      background: rgba(0, 255, 102, 0.02);
+    }
+
+    .mockup-side-item {
+      height: 14px;
+      border-radius: 4px;
+      background: var(--border);
+    }
+
+    .mockup-side-item.active {
+      background: var(--neon-green);
+      box-shadow: 0 0 12px var(--neon-green-glow);
+    }
+
+    .mockup-main {
+      flex: 1;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .mockup-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+    }
+
+    .mockup-stat {
+      height: 54px;
+      border-radius: 10px;
+      background: rgba(0, 255, 102, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    .mockup-chart {
+      flex: 1;
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 0.75rem;
+      background: rgba(0, 255, 102, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .mockup-bar {
+      flex: 1;
+      height: var(--h);
+      min-height: 16px;
+      background: linear-gradient(180deg, var(--neon-green), var(--neon-green-dim));
+      border-radius: 4px 4px 0 0;
+      opacity: 0.85;
+      transition: opacity 0.3s ease;
+    }
+
+    .mockup-bar:hover {
+      opacity: 1;
+    }
+
     /* Features Section */
     .features {
-      padding: 5rem 3rem;
+      padding: 5.5rem 3rem;
       position: relative;
       z-index: 1;
       background: var(--bg-secondary);
     }
 
+    .features::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(0, 255, 102, 0.09) 1px, transparent 1px);
+      background-size: 26px 26px;
+      -webkit-mask-image: radial-gradient(ellipse 65% 70% at 50% 40%, #000 0%, transparent 78%);
+      mask-image: radial-gradient(ellipse 65% 70% at 50% 40%, #000 0%, transparent 78%);
+      pointer-events: none;
+    }
+
+    .features::after {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      max-width: 700px;
+      height: 240px;
+      background: var(--neon-green);
+      opacity: 0.03;
+      filter: blur(90px);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
     .features-container {
       max-width: 1200px;
       margin: 0 auto;
+      position: relative;
+      z-index: 1;
     }
 
     .section-header {
       text-align: center;
-      margin-bottom: 4rem;
+      margin-bottom: 2.75rem;
     }
 
     .section-label {
@@ -410,25 +590,33 @@ require_once 'php/config.php';
 
     .feature-card:hover {
       border-color: var(--neon-green);
-      transform: translateY(-8px);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+      transform: translateY(-10px) scale(1.02);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4), 0 0 45px var(--neon-green-subtle);
     }
 
     .feature-card:hover::before {
       width: 100%;
     }
 
+    .feature-card:hover .feature-icon {
+      background: var(--neon-green);
+      color: var(--bg-primary);
+      box-shadow: 0 0 35px var(--neon-green-glow);
+      transform: scale(1.06);
+    }
+
     .feature-icon {
-      width: 70px;
-      height: 70px;
+      width: 92px;
+      height: 92px;
       background: var(--neon-green-subtle);
       border: 1px solid rgba(0, 255, 102, 0.2);
-      border-radius: 16px;
+      border-radius: 22px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 1.5rem;
-      font-size: 2rem;
+      margin: 0 auto 1.75rem;
+      font-size: 2.4rem;
+      transition: all 0.4s ease;
     }
 
     .feature-title {
@@ -444,14 +632,44 @@ require_once 'php/config.php';
 
     /* Login Cards Section */
     .login-section {
-      padding: 6rem 3rem;
+      padding: 7rem 3rem;
       position: relative;
       z-index: 1;
+    }
+
+    .login-section::before {
+      content: '';
+      position: absolute;
+      top: 5%;
+      right: 6%;
+      width: 380px;
+      height: 380px;
+      background: var(--neon-green);
+      opacity: 0.03;
+      filter: blur(110px);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .login-section::after {
+      content: '';
+      position: absolute;
+      bottom: -10%;
+      left: 6%;
+      width: 340px;
+      height: 340px;
+      background: var(--neon-green);
+      opacity: 0.025;
+      filter: blur(100px);
+      border-radius: 50%;
+      pointer-events: none;
     }
 
     .login-container {
       max-width: 1200px;
       margin: 0 auto;
+      position: relative;
+      z-index: 1;
     }
 
     .login-grid {
@@ -648,6 +866,22 @@ require_once 'php/config.php';
         flex-direction: column;
       }
 
+      .hero-mockup {
+        margin-top: 2.5rem;
+      }
+
+      .mockup-sidebar {
+        display: none;
+      }
+
+      .mockup-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .mockup-body {
+        min-height: 200px;
+      }
+
       .section-title {
         font-size: 2rem;
       }
@@ -678,6 +912,7 @@ require_once 'php/config.php';
       <div class="hero-illustration"></div>
       <div class="hero-overlay"></div>
     </div>
+    <div class="hero-glow"></div>
     <div class="hero-badge">Platform Live</div>
     <h1 class="hero-title">
       Welcome to <span class="highlight">Internship Tracking System</span>
@@ -688,6 +923,39 @@ require_once 'php/config.php';
     <div class="hero-cta">
       <a href="#login" class="btn-hero">Get Started</a>
       <a href="#features" class="btn-hero-secondary">Learn More</a>
+    </div>
+    <div class="hero-mockup" aria-hidden="true">
+      <div class="mockup-topbar">
+        <span class="mockup-dot"></span><span class="mockup-dot"></span><span class="mockup-dot"></span>
+        <span class="mockup-url">app.interntrack.io/dashboard</span>
+      </div>
+      <div class="mockup-body">
+        <div class="mockup-sidebar">
+          <span class="mockup-side-item"></span>
+          <span class="mockup-side-item active"></span>
+          <span class="mockup-side-item"></span>
+          <span class="mockup-side-item"></span>
+          <span class="mockup-side-item"></span>
+        </div>
+        <div class="mockup-main">
+          <div class="mockup-stats">
+            <div class="mockup-stat"></div>
+            <div class="mockup-stat"></div>
+            <div class="mockup-stat"></div>
+            <div class="mockup-stat"></div>
+          </div>
+          <div class="mockup-chart">
+            <div class="mockup-bar" style="--h:38%"></div>
+            <div class="mockup-bar" style="--h:55%"></div>
+            <div class="mockup-bar" style="--h:42%"></div>
+            <div class="mockup-bar" style="--h:70%"></div>
+            <div class="mockup-bar" style="--h:58%"></div>
+            <div class="mockup-bar" style="--h:85%"></div>
+            <div class="mockup-bar" style="--h:66%"></div>
+            <div class="mockup-bar" style="--h:92%"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -729,7 +997,7 @@ require_once 'php/config.php';
         <div class="login-card">
           <div class="login-card-icon"><i class="fas fa-right-to-bracket"></i></div>
           <h3 class="login-card-title">One Login, Every Role</h3>
-          <p class="login-card-desc">Sign in with your account and you'll be taken straight to the right place — students land on their dashboard, admins land on the admin console.</p>
+          <p class="login-card-desc">Sign in with your account and land right where you belong — your dashboard, your console, your workspace.</p>
           <a href="index.php" class="btn-login-card">Sign In</a>
         </div>
       </div>
@@ -759,19 +1027,13 @@ require_once 'php/config.php';
       });
     });
 
-    // Add subtle parallax effect on mouse move
-    document.addEventListener('mousemove', (e) => {
-      const cards = document.querySelectorAll('.feature-card, .login-card');
-      const x = e.clientX / window.innerWidth;
-      const y = e.clientY / window.innerHeight;
-
-      cards.forEach((card, index) => {
-        const depth = (index + 1) * 2;
-        const moveX = (x - 0.5) * depth;
-        const moveY = (y - 0.5) * depth;
-        card.style.transform = `translate(${moveX}px, ${moveY}px)`;
-      });
-    });
+    // Reveal the nav "Get Started" button only after scrolling past the hero
+    const navbar = document.querySelector('.navbar');
+    function onScroll() {
+      navbar.classList.toggle('scrolled', window.scrollY > 120);
+    }
+    window.addEventListener('scroll', onScroll);
+    onScroll();
   </script>
 
 </body>

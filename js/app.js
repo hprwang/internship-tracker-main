@@ -540,6 +540,7 @@ async function handleRegister(e) {
   const email    = form.querySelector('input[name="email"]')?.value?.trim() || '';
   const password = form.querySelector('input[name="password"]')?.value || '';
   const confirm  = form.querySelector('input[name="confirm_password"]')?.value || '';
+  const otpInput = form.querySelector('input[name="otp"]');
 
   if (fullName.length < 2)             { toast('Full name must be at least 2 characters.', 'error'); return; }
   if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) { toast('Username must be 3–30 alphanumeric characters.', 'error'); return; }
@@ -548,6 +549,10 @@ async function handleRegister(e) {
   if (!/[A-Z]/.test(password))        { toast('Password must contain at least one uppercase letter.', 'error'); return; }
   if (!/[0-9]/.test(password))        { toast('Password must contain at least one number.', 'error'); return; }
   if (password !== confirm)           { toast('Passwords do not match.', 'error'); return; }
+  if (otpInput && !/^\d{6}$/.test((otpInput.value || '').trim())) {
+    toast('Enter the 6-digit verification code sent to your email.', 'error');
+    return;
+  }
 
   btn.textContent = 'Creating…';
   btn.disabled = true;

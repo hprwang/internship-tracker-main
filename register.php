@@ -279,6 +279,42 @@ $csrf = generateCSRF();
       box-shadow: 0 10px 30px rgba(34, 197, 94, 0.3);
     }
 
+    /* Email send-code row */
+    .email-send-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: stretch;
+    }
+
+    .email-send-row .form-control {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .btn-send-code {
+      padding: 0.875rem 1.1rem;
+      background: linear-gradient(135deg, #16A34A, #22C55E);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.3s ease;
+    }
+
+    .btn-send-code:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-send-code:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
     .btn-secondary {
       width: 100%;
       padding: 0.875rem 1.25rem;
@@ -475,20 +511,28 @@ $csrf = generateCSRF();
         >
             <input type="hidden" name="role_hint" value="student">
 
-            <div class="form-group">
-              <label class="form-label">Full Name</label>
-              <input type="text" name="full_name" class="form-control" placeholder="Your full name" required>
-            </div>
-
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Username</label>
                 <input type="text" name="username" class="form-control" placeholder="Choose a username" required>
               </div>
               <div class="form-group">
-                <label class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" placeholder="email@example.com" required>
+                <label class="form-label">Full Name</label>
+                <input type="text" name="full_name" class="form-control" placeholder="Your full name" required>
               </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <div class="email-send-row">
+                <input type="email" name="email" id="reg-email" class="form-control" placeholder="email@example.com" required>
+                <button type="button" id="send-otp-btn" class="btn-send-code" onclick="sendOtp()">Send Code</button>
+              </div>
+            </div>
+
+            <div class="form-group" id="otp-group" style="display:none">
+              <label class="form-label">Verification Code</label>
+              <input type="text" name="otp" id="reg-otp" class="form-control" placeholder="Enter the 6-digit code sent to your email" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code">
             </div>
 
             <div class="form-group">
@@ -544,7 +588,7 @@ $csrf = generateCSRF();
 
   <script src="js/app.js"></script>
   <script src="js/interactive.js"></script>
-  <script>
+<script>
   function togglePasswordIcon(btn) {
     var input = btn.parentElement.querySelector('input');
     if (input) {
@@ -552,6 +596,66 @@ $csrf = generateCSRF();
       btn.innerHTML = input.type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
     }
   }
-  </script>
+
+  var otpTimer = null;
+
+  async function sendOtp() {
+    var emailInput = document.getElementById('reg-email');
+    var email = emailInput.value.trim();
+    if (!email.includes('@')) {
+      toast('Please enter a valid email address first.', 'error');
+      emailInput.focus();
+      return;
+    }
+
+    var btn = document.getElementById('send-otp-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    var inPhpFolder = window.location.pathname.includes('/php/');
+    var authPath = inPhpFolder ? 'auth.php' : 'php/auth.php';
+
+    try {
+      var res = await fetch(authPath, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'send_otp', email: email, csrf_token: csrfToken }).toString()
+      });
+      var data = await res.json();
+      if (data.success) {
+        toast(data.message || 'Verification code sent!', 'success');
+        document.getElementById('otp-group').style.display = 'block';
+        document.getElementById('reg-otp').focus();
+        startOtpCountdown(btn);
+      } else {
+        toast(data.message || 'Could not send the code.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Send Code';
+      }
+    } catch (err) {
+      toast('Network error. Please try again.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Send Code';
+    }
+  }
+
+  function startOtpCountdown(btn) {
+    if (otpTimer) clearInterval(otpTimer);
+    var seconds = 60;
+    btn.textContent = 'Resend in ' + seconds + 's';
+    otpTimer = setInterval(function () {
+      seconds--;
+      if (seconds <= 0) {
+        clearInterval(otpTimer);
+        otpTimer = null;
+        btn.disabled = false;
+        btn.textContent = 'Resend Code';
+      } else {
+        btn.textContent = 'Resend in ' + seconds + 's';
+      }
+    }, 1000);
+  }
+</script>
 </body>
 </html>

@@ -151,6 +151,29 @@ function ensureAchievementsTable(): void {
 }
 
 /**
+ * Email verification (OTP) — ensures the email_verifications table exists and
+ * the users.email_verified column is present. MariaDB supports ADD COLUMN IF NOT EXISTS.
+ */
+function ensureEmailVerification(): void {
+    try {
+        $db = Database::getConnection();
+        $db->exec("CREATE TABLE IF NOT EXISTS email_verifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(150) NOT NULL,
+            code_hash VARCHAR(255) NOT NULL,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_email (email),
+            INDEX idx_expires (expires_at)
+        ) ENGINE=InnoDB");
+        $db->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified TINYINT(1) DEFAULT 1");
+    } catch (Exception $e) {
+        error_log("Email verification table error: " . $e->getMessage());
+    }
+}
+
+/**
  * Rate limiting — stored in the login_rate_limits DB table (no temp files, no JSON).
  * The table is created automatically on first use.
  */

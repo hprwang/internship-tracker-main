@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS users (
   full_name VARCHAR(150) NOT NULL,
   company_id INT DEFAULT NULL,
   is_active TINYINT(1) DEFAULT 1,
+  email_verified TINYINT(1) DEFAULT 1,
   last_login TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -195,6 +196,18 @@ CREATE TABLE IF NOT EXISTS password_resets (
   INDEX idx_email (email),
   INDEX idx_expires (expires_at),
   INDEX idx_user (user_id)
+) ENGINE=InnoDB;
+
+-- Email verification OTP codes
+CREATE TABLE IF NOT EXISTS email_verifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(150) NOT NULL,
+  code_hash VARCHAR(255) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email (email),
+  INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB;
 
 -- In-app notifications (+ email demo fallback)

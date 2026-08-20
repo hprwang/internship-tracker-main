@@ -19,6 +19,9 @@ switch ($action) {
     case 'register':
         handleRegister();
         break;
+    case 'send_otp':
+        handleSendOtp();
+        break;
     case 'forgot_request':
         handleForgotRequest();
         break;
@@ -52,9 +55,11 @@ function handleLogin(): void {
     }
 
     $db = Database::getConnection();
+    ensureEmailVerification();
+
     $isEmail = filter_var($username, FILTER_VALIDATE_EMAIL);
     $col = $isEmail ? 'email' : 'username';
-    $stmt = $db->prepare("SELECT id, username, email, password_hash, role, full_name, company_id, is_active
+    $stmt = $db->prepare("SELECT id, username, email, password_hash, role, full_name, company_id, is_active, email_verified
                           FROM users WHERE $col = ? LIMIT 1");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
@@ -64,6 +69,7 @@ function handleLogin(): void {
         jsonResponse(false, 'Invalid username or password.');
     }
     if ((int)$user['is_active'] !== 1) jsonResponse(false, 'Account is disabled. Contact administrator.');
+    if ((int)($user['email_verified'] ?? 1) !== 1) jsonResponse(false, 'Please verify your email address before logging in.');
 
     // Company accounts are no longer supported (company portal removed).
     if ($user['role'] === 'company') {
@@ -117,10 +123,14 @@ function handleRegister(): void {
     $email    = trim($_POST['email'] ?? '');
     $password = trim($_POST['password'] ?? '');
     $csrf     = trim($_POST['csrf_token'] ?? '');
+    $otp      = trim($_POST['otp'] ?? '');
 
     // Public registration always creates a student account. Admin accounts are
     // only created by the migration/seed script, never via public registration.
     $role = 'student';
+
+    // OTP email verification is required for public (student) registration only.
+    $requireOtp = (($_POST['role_hint'] ?? 'student') !== 'admin');
 
     if (!verifyCSRF($csrf)) jsonResponse(false, 'Invalid request token.');
 
@@ -134,6 +144,13 @@ function handleRegister(): void {
     if (!preg_match('/[0-9]/', $password)) jsonResponse(false, 'Password must contain a number.');
     if ($password !== $confirmPassword) {
         jsonResponse(false, 'Passwords do not match.');
+    }
+
+    // Require a verified OTP before the account can be created
+    if ($requireOtp) {
+        ensureEmailVerification();
+        if (!preg_match('/^\d{6}$/', $otp)) jsonResponse(false, 'Enter the 6-digit verification code sent to your email.');
+        if (!verifyOtpCode($email, $otp)) jsonResponse(false, 'Invalid or expired verification code. Please click Send Code and try again.');
     }
 
     $db = Database::getConnection();
@@ -154,10 +171,16 @@ function handleRegister(): void {
         }
 
         $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
-        $stmt = $db->prepare("INSERT INTO users (username, email, password_hash, role, full_name, company_id)
-                              VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$username, $email, $hash, $role, $fullName, null]);
+        $stmt = $db->prepare("INSERT INTO users (username, email, password_hash, role, full_name, company_id, email_verified)
+                              VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$username, $email, $hash, $role, $fullName, null, 1]);
         $newId = (int)$db->lastInsertId();
+
+        // Consume the OTP so it cannot be reused
+        if ($requireOtp) {
+            $db->prepare("UPDATE email_verifications SET used_at = UTC_TIMESTAMP() WHERE email = ? AND used_at IS NULL")
+               ->execute([$email]);
+        }
     } catch (PDOException $e) {
         error_log("Registration error: " . $e->getMessage());
         jsonResponse(false, 'Registration failed. Please try again.');
@@ -170,6 +193,85 @@ function handleRegister(): void {
 
     $message = 'Account created successfully! You can now log in.';
     jsonResponse(true, $message);
+}
+
+/**
+ * Check whether a stored OTP code matches the given email (and is not expired/used).
+ */
+function verifyOtpCode(string $email, string $otp): bool {
+    try {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT code_hash FROM email_verifications
+                              WHERE email = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()
+                              ORDER BY created_at DESC LIMIT 5");
+        $stmt->execute([$email]);
+        foreach ($stmt->fetchAll() as $r) {
+            if (password_verify($otp, $r['code_hash'])) return true;
+        }
+    } catch (Exception $e) {
+        error_log("OTP verify error: " . $e->getMessage());
+    }
+    return false;
+}
+
+/**
+ * Send a 6-digit OTP verification code to an email address.
+ * Used on the public registration page before an account can be created.
+ */
+function handleSendOtp(): void {
+    $email = trim($_POST['email'] ?? '');
+    $csrf  = $_POST['csrf_token'] ?? '';
+
+    if (!verifyCSRF($csrf)) jsonResponse(false, 'Invalid request token.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonResponse(false, 'Invalid email address.');
+
+    ensureEmailVerification();
+    $db = Database::getConnection();
+
+    // Reject if the email is already registered
+    $chk = $db->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+    $chk->execute([$email]);
+    if ($chk->fetch()) jsonResponse(false, 'This email is already registered. Please sign in instead.');
+
+    // Rate limit: max 3 sends per 60 seconds per email
+    $rateKey = 'otp_' . md5(strtolower($email));
+    if (!checkRateLimit($rateKey, 3, 60)) {
+        jsonResponse(false, 'Too many requests. Please wait a minute and try again.');
+    }
+
+    $code     = (string)random_int(100000, 999999);
+    $codeHash = password_hash($code, PASSWORD_BCRYPT, ['cost' => 10]);
+
+    // Invalidate any previous unused codes for this email
+    $db->prepare("UPDATE email_verifications SET used_at = UTC_TIMESTAMP() WHERE email = ? AND used_at IS NULL")
+       ->execute([$email]);
+
+    $ins = $db->prepare("INSERT INTO email_verifications (email, code_hash, expires_at)
+                         VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE))");
+    $ins->execute([$email, $codeHash]);
+
+    $appName = defined('APP_NAME') ? APP_NAME : 'InternTrack';
+    $subject = "Your {$appName} verification code";
+
+    $bodyText = "Your {$appName} verification code is: {$code}\n\n"
+              . "Enter this code on the registration page to verify your email address.\n"
+              . "The code expires in 10 minutes.\n\n"
+              . "If you didn't request this, you can ignore this email.";
+
+    $bodyHtml = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #2A2A2A;border-radius:12px;background:#161616;color:#FFFFFF;">'
+              . '<h2 style="margin:0 0 8px;color:#22C55E;">' . e($appName) . ' Verification</h2>'
+              . '<p>Hi there,</p>'
+              . '<p>Use the verification code below to complete your registration:</p>'
+              . '<div style="font-size:32px;font-weight:800;letter-spacing:8px;color:#22C55E;background:#0A0A0A;border-radius:8px;padding:16px;text-align:center;margin:16px 0;">' . e($code) . '</div>'
+              . '<p style="color:#A1A1AA;font-size:14px;">This code expires in 10 minutes. If you did not request it, you can safely ignore this email.</p>'
+              . '</div>';
+
+    $sent = sendMailViaSMTP($email, '', $subject, $bodyHtml, $bodyText);
+    if (!$sent) {
+        jsonResponse(false, 'We could not send the verification email. Please try again.');
+    }
+
+    jsonResponse(true, 'Verification code sent to your email. Please check your inbox (and spam folder).');
 }
 
 /**
