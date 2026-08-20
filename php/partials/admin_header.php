@@ -15,6 +15,7 @@ function renderAdminSidebar(array $user, string $activePage): void {
         'companies'    => ['admin_companies.php', 'fa-building', 'Companies'],
         'internships'  => ['admin_internships.php', 'fa-briefcase', 'Internships'],
         'applications' => ['admin_applications.php', 'fa-clipboard-check', 'Applications'],
+        'activity'     => ['admin_activity.php', 'fa-history', 'Activity Log'],
         'reports'      => ['admin_reports.php', 'fa-chart-bar', 'Reports'],
         'settings'     => ['admin_settings.php', 'fa-cog', 'Settings'],
     ];
