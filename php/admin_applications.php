@@ -18,29 +18,36 @@ $csrf = generateCSRF();
 $db = Database::getConnection();
 $filter = $_GET['filter'] ?? 'all';
 
-// Get applications - all internships that have status applied or interview
+// Applications students submitted to company postings (applications table).
+// NOTE: this used to read from the legacy `internships` table (students'
+// self-logged internships), which is a separate feature — that meant Accept/
+// Reject here never touched the row shown on the student's "My Applications"
+// tab. Fixed to query/act on `applications` instead.
 $statusWhere = match($filter) {
-    'pending' => "i.status = 'applied'",
-    'interview' => "i.status = 'interview'",
-    default => "i.status IN ('applied', 'interview')"
+    'pending' => "a.status = 'pending'",
+    'interview' => "a.status = 'under_review'",
+    default => "a.status IN ('pending', 'under_review')"
 };
 
 $applications = $db->query("
-    SELECT i.*, u.full_name as student_name, u.email as student_email, c.name as company_name, c.industry as company_industry
-    FROM internships i
-    LEFT JOIN users u ON i.student_id = u.id
-    LEFT JOIN companies c ON i.company_id = c.id
+    SELECT a.*, u.full_name as student_name, u.email as student_email,
+           c.name as company_name, c.industry as company_industry,
+           ci.title as title
+    FROM applications a
+    LEFT JOIN users u ON a.student_id = u.id
+    LEFT JOIN company_internships ci ON a.company_internship_id = ci.id
+    LEFT JOIN companies c ON ci.company_id = c.id
     WHERE $statusWhere
-    ORDER BY i.created_at DESC
+    ORDER BY a.applied_at DESC
 ")->fetchAll();
 
 // Stats for all applications
 $allApps = $db->query("
-    SELECT i.* FROM internships i WHERE i.status IN ('applied', 'interview')
+    SELECT status FROM applications WHERE status IN ('pending', 'under_review')
 ")->fetchAll();
 $total = count($allApps);
-$pending = count(array_filter($allApps, fn($a) => $a['status'] === 'applied'));
-$interview = count(array_filter($allApps, fn($a) => $a['status'] === 'interview'));
+$pending = count(array_filter($allApps, fn($a) => $a['status'] === 'pending'));
+$interview = count(array_filter($allApps, fn($a) => $a['status'] === 'under_review'));
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
@@ -138,8 +145,10 @@ $interview = count(array_filter($allApps, fn($a) => $a['status'] === 'interview'
     .data-table tr:hover td { background: var(--bg-elevated); }
 
     .status-badge { display: inline-flex; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: capitalize; }
-    .status-badge.applied { background: rgba(245,158,11,0.15); color: #F59E0B; }
-    .status-badge.interview { background: rgba(139,92,246,0.15); color: #8B5CF6; }
+    .status-badge.pending { background: rgba(245,158,11,0.15); color: #F59E0B; }
+    .status-badge.under_review { background: rgba(139,92,246,0.15); color: #8B5CF6; }
+    .status-badge.accepted { background: rgba(34,197,94,0.15); color: #22C55E; }
+    .status-badge.rejected { background: rgba(239,68,68,0.15); color: #F87171; }
 
     .company-badge { display: inline-flex; align-items: center; gap: 0.375rem; }
     .company-badge .industry-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green-neon); }
@@ -199,7 +208,7 @@ $interview = count(array_filter($allApps, fn($a) => $a['status'] === 'interview'
       </div>
       <div class="stat-card">
         <div class="stat-value interview"><?= $interview ?></div>
-        <div class="stat-label">Interview</div>
+        <div class="stat-label">Under Review</div>
       </div>
     </div>
 
@@ -207,7 +216,7 @@ $interview = count(array_filter($allApps, fn($a) => $a['status'] === 'interview'
       <div class="filter-tabs">
         <a href="?filter=all" class="filter-tab <?= $filter === 'all' ? 'active' : '' ?>">All (<?= $total ?>)</a>
         <a href="?filter=pending" class="filter-tab <?= $filter === 'pending' ? 'active' : '' ?>">Pending (<?= $pending ?>)</a>
-        <a href="?filter=interview" class="filter-tab <?= $filter === 'interview' ? 'active' : '' ?>">Interview (<?= $interview ?>)</a>
+        <a href="?filter=interview" class="filter-tab <?= $filter === 'interview' ? 'active' : '' ?>">Under Review (<?= $interview ?>)</a>
       </div>
 
 <table class="data-table" data-no-bulk>
@@ -238,12 +247,12 @@ $interview = count(array_filter($allApps, fn($a) => $a['status'] === 'interview'
               <div style="font-size: 0.75rem; color: var(--text-muted);"><?= e($a['company_industry'] ?? '') ?></div>
             </td>
             <td><?= e($a['title']) ?></td>
-            <td><span class="status-badge <?= e($a['status']) ?>"><?= e($a['status']) ?></span></td>
-            <td><?= date('M d, Y', strtotime($a['created_at'])) ?></td>
+            <td><span class="status-badge <?= e($a['status']) ?>"><?= e(str_replace('_', ' ', $a['status'])) ?></span></td>
+            <td><?= date('M d, Y', strtotime($a['applied_at'])) ?></td>
             <td>
               <div class="action-btn-group">
                 <button class="btn btn-accept action-btn" onclick="reviewApplication(<?= $a['id'] ?>, 'accepted')">Accept</button>
-                <button class="btn btn-interview action-btn" onclick="reviewApplication(<?= $a['id'] ?>, 'interview')">Interview</button>
+                <button class="btn btn-interview action-btn" onclick="reviewApplication(<?= $a['id'] ?>, 'under_review')">Under Review</button>
                 <button class="btn btn-reject action-btn" onclick="reviewApplication(<?= $a['id'] ?>, 'rejected')">Reject</button>
               </div>
             </td>
@@ -270,11 +279,11 @@ function toast(msg, type = 'info') {
 }
 
 function reviewApplication(id, status) {
-  const statusText = status === 'accepted' ? 'accept' : status === 'interview' ? 'schedule interview for' : 'reject';
+  const statusText = status === 'accepted' ? 'accept' : status === 'under_review' ? 'mark under review' : 'reject';
   if (!confirm(`Are you sure you want to ${statusText} application #${id}?`)) return;
 
   const fd = new FormData();
-  fd.append('action', 'update_internship_status');
+  fd.append('action', 'update_application_status');
   fd.append('id', id);
   fd.append('status', status);
   fd.append('csrf_token', App.csrfToken);

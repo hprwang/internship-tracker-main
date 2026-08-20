@@ -223,6 +223,65 @@ switch ($action) {
         }
         break;
 
+    // Reviewing a student's application to a company posting (applications table —
+    // NOT the same table/feature as update_internship_status above, which only
+    // touches a student's self-logged internships).
+    case 'update_application_status':
+        $id = (int)($_POST['id'] ?? 0);
+        $status = $_POST['status'] ?? '';
+        $valid = ['pending', 'under_review', 'accepted', 'rejected'];
+        if ($id && in_array($status, $valid, true)) {
+            $prevStmt = $db->prepare("
+                SELECT a.student_id, a.status, ci.title
+                FROM applications a
+                JOIN company_internships ci ON a.company_internship_id = ci.id
+                WHERE a.id = ?
+            ");
+            $prevStmt->execute([$id]);
+            $prev = $prevStmt->fetch();
+
+            $db->prepare("UPDATE applications SET status = ? WHERE id = ?")->execute([$status, $id]);
+            logActivity($user['id'], 'update_application_status', 'applications', $id);
+
+            if ($prev && $prev['student_id'] && $prev['status'] !== $status) {
+                notify(
+                    (int)$prev['student_id'],
+                    'Application status updated',
+                    "Your application for \"{$prev['title']}\" is now " . str_replace('_', ' ', $status) . '.',
+                    'info'
+                );
+            }
+            echo json_encode(['success' => true, 'message' => 'Status updated.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Invalid status.']);
+        }
+        break;
+
+    // My Applications (for students)
+    case 'my_applications':
+        $user = $_SESSION['user'] ?? null;
+        if (!$user || !in_array($user['role'] ?? '', ['admin', 'super_admin'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Admin access required.']);
+            exit;
+        }
+
+        $db = Database::getConnection();
+        $stmt = $db->prepare("
+            SELECT a.*, ci.title AS internship_title, ci.location AS internship_location,
+                   ci.stipend, c.name AS company_name, i.status
+            FROM applications a
+            JOIN company_internships ci ON a.company_internship_id = ci.id
+            JOIN companies c ON ci.company_id = c.id
+            JOIN internships i ON ci.id = i.id
+            WHERE a.student_id = ?
+            ORDER BY a.applied_at DESC
+        ");
+        $stmt->execute([(int)$user['id']]);
+        $apps = $stmt->fetchAll();
+        jsonResponse(true, '', ['applications' => $apps]);
+        break;
+
     // Admin Users
     case 'list_admins':
         $stmt = $db->query("SELECT id, username, email, full_name, is_active, last_login FROM users WHERE role = 'admin' ORDER BY created_at DESC");
