@@ -91,7 +91,7 @@ $settings = array_merge($defaults, $settings);
     .user-chip { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem; background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-subtle); }
     .user-avatar { width: 34px; height: 34px; background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: var(--bg-deep); }
     .user-info { flex: 1; min-width: 0; }
-    .user-name { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-name { font-size: 0.85rem; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
     .user-role { font-size: 0.7rem; color: var(--text-muted); }
     .logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.85rem; cursor: pointer; transition: all var(--transition); border: 1px solid var(--border-subtle); background: transparent; width: 100%; margin-top: 0.5rem; }
     .logout-btn:hover { border-color: rgba(239,68,68,0.4); color: #F87171; background: rgba(239,68,68,0.08); }
@@ -104,8 +104,15 @@ $settings = array_merge($defaults, $settings);
     .page-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all var(--transition); border: none; text-decoration: none; }
-    .btn-primary { background: var(--green-neon); color: var(--bg-deep); }
-    .btn-primary:hover { background: var(--green-glow); box-shadow: 0 0 20px rgba(34,197,94,0.4); }
+    .btn-primary { background: linear-gradient(135deg, #22C55E, #16A34A); color: #0a0f0d; font-weight: 700; border-radius: 8px; box-shadow: 0 0 14px rgba(34,197,94,0.25); }
+    .btn-primary:hover { background: linear-gradient(135deg, #34D972, #22C55E); box-shadow: 0 0 24px rgba(34,197,94,0.45); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); box-shadow: 0 0 10px rgba(34,197,94,0.2); }
+    .btn-primary:disabled, .btn-primary[disabled] { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border-subtle); box-shadow: none; transform: none; cursor: not-allowed; opacity: 0.75; }
+    .btn-primary.pulse { animation: pulseGlow 1.6s ease-in-out infinite; }
+    @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 14px rgba(34,197,94,0.25); } 50% { box-shadow: 0 0 26px rgba(34,197,94,0.5); } }
+    .btn-primary .btn-spinner { display: none; width: 14px; height: 14px; border: 2px solid rgba(10,15,13,0.3); border-top-color: #0a0f0d; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    .btn-primary.saving .btn-spinner { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
     .btn-secondary:hover { border-color: var(--green-neon); color: var(--green-neon); }
 
@@ -147,6 +154,56 @@ $settings = array_merge($defaults, $settings);
     .toast.error { border-color: #F87171; }
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
+    /* Constrain content so cards don't stretch into a mostly-empty full-height panel */
+    .content-wrap { max-width: 980px; margin: 0 auto; }
+
+    /* Empty-field treatment: dashed/italic signals "not set", solid/white signals a real saved value */
+    .field-empty { border-style: dashed; border-color: var(--border-light); color: var(--text-muted); font-style: italic; }
+    .field-empty:focus { border-style: solid; border-color: var(--green-neon); color: var(--text-primary); font-style: normal; box-shadow: 0 0 0 3px rgba(34,197,94,0.1); }
+    .field-empty::placeholder { color: var(--text-muted); }
+
+    /* Inline unit labels + validation hints for numeric fields */
+    .input-unit { position: relative; display: flex; align-items: center; }
+    .input-unit .form-control { padding-right: 3.5rem; }
+    .input-unit .unit { position: absolute; right: 0.875rem; font-size: 0.72rem; color: var(--text-muted); pointer-events: none; }
+    .form-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.375rem; }
+
+    /* Maintenance toggle: red-tinted off track so it reads as a toggle against the danger card */
+    .danger-zone .toggle { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.45); }
+    .danger-zone .toggle::after { background: #F87171; }
+    .danger-zone .toggle.active { background: #EF4444; border-color: #EF4444; box-shadow: 0 0 14px rgba(239,68,68,0.35); }
+    .danger-zone .toggle.active::after { background: #FFFFFF; }
+    .danger-note { font-size: 0.72rem; color: #F87171; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.4rem; }
+    .danger-note strong { color: #F87171; }
+
+    /* Live configuration summary on the General tab */
+    .config-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+    .config-summary .stat { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.875rem 1rem; }
+    .config-summary .stat .stat-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .config-summary .stat .stat-value { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); word-break: break-word; }
+    .config-summary .stat .stat-value.off { color: #F87171; }
+    .config-summary .stat .stat-value.on { color: var(--green-neon); }
+
+    /* Unsaved-changes indicators tied to the global Save button */
+    .unsaved-pill { display: none; align-items: center; gap: 0.4rem; padding: 0.3rem 0.7rem; border-radius: 999px; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.4); color: var(--green-neon); font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .unsaved-pill.visible { display: inline-flex; }
+    .unsaved-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-neon); box-shadow: 0 0 8px var(--green-neon); }
+
+    /* Tab icons + per-tab unsaved dot */
+    .tab-btn { display: inline-flex; align-items: center; gap: 0.5rem; }
+    .tab-btn .tab-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--green-neon); box-shadow: 0 0 6px var(--green-neon); }
+    .tab-btn.dirty .tab-dot { display: inline-block; }
+
+    /* Confirmation dialog for high-impact actions (maintenance mode) */
+    .confirm-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.7); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .confirm-box { background: var(--bg-card); border: 1px solid rgba(239,68,68,0.4); border-radius: var(--radius-lg); padding: 1.5rem; max-width: 420px; width: 100%; box-shadow: var(--shadow-soft); animation: slideUp 0.2s ease; }
+    @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .confirm-box .confirm-title { font-size: 1.05rem; font-weight: 700; color: #F87171; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+    .confirm-box .confirm-msg { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+    .confirm-actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
+    .btn-danger { background: #EF4444; color: #fff; }
+    .btn-danger:hover { background: #F87171; box-shadow: 0 0 18px rgba(239,68,68,0.4); }
+
     @media (max-width: 900px) {
       .admin-layout { grid-template-columns: 1fr; }
       .sidebar { display: none; }
@@ -165,20 +222,23 @@ $settings = array_merge($defaults, $settings);
     <div class="page-header">
       <div>
         <h1 class="page-title">System <span>Settings</span></h1>
-        <p class="page-subtitle">Configure system preferences, security, and notifications</p>
+        <p class="page-subtitle">Configure system preferences, security, and notifications. Changes are kept across tabs until you click Save Changes.</p>
       </div>
       <div class="header-actions">
-        <button type="submit" form="settings-form" class="btn btn-primary">Save Changes</button>
+        <span class="unsaved-pill" id="unsaved-pill"><span class="dot"></span>Unsaved changes</span>
+        <button type="submit" form="settings-form" id="save-btn" class="btn btn-primary" title="Your settings are up to date"><span class="btn-spinner"></span><span class="btn-label">Save Changes</span></button>
       </div>
     </div>
 
+    <div class="content-wrap">
+
     <div class="tabs">
-      <button class="tab-btn active" data-tab="general">General</button>
-      <button class="tab-btn" data-tab="registration">Registration</button>
-      <button class="tab-btn" data-tab="internships">Internships</button>
-      <button class="tab-btn" data-tab="notifications">Notifications</button>
-      <button class="tab-btn" data-tab="security">Security</button>
-      <button class="tab-btn" data-tab="maintenance">Maintenance</button>
+      <button class="tab-btn active" data-tab="general"><i class="fa-solid fa-sliders"></i>General<span class="tab-dot"></span></button>
+      <button class="tab-btn" data-tab="registration"><i class="fa-solid fa-user-plus"></i>Registration<span class="tab-dot"></span></button>
+      <button class="tab-btn" data-tab="internships"><i class="fa-solid fa-briefcase"></i>Internships<span class="tab-dot"></span></button>
+      <button class="tab-btn" data-tab="notifications"><i class="fa-solid fa-bell"></i>Notifications<span class="tab-dot"></span></button>
+      <button class="tab-btn" data-tab="security"><i class="fa-solid fa-shield-halved"></i>Security<span class="tab-dot"></span></button>
+      <button class="tab-btn" data-tab="maintenance"><i class="fa-solid fa-triangle-exclamation"></i>Maintenance<span class="tab-dot"></span></button>
     </div>
 
     <form id="settings-form">
@@ -194,12 +254,25 @@ $settings = array_merge($defaults, $settings);
             </div>
             <div class="form-group">
               <label class="form-label">Contact Email</label>
-              <input type="email" name="site_email" class="form-control" value="<?= e($settings['site_email']) ?>" placeholder="admin@example.com">
+              <input type="email" name="site_email" class="form-control<?= $settings['site_email'] !== '' ? '' : ' field-empty' ?>" value="<?= e($settings['site_email']) ?>" placeholder="admin@example.com">
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Contact Phone</label>
-            <input type="tel" name="site_phone" class="form-control" value="<?= e($settings['site_phone']) ?>" placeholder="+1 (555) 000-0000">
+            <input type="tel" name="site_phone" class="form-control<?= $settings['site_phone'] !== '' ? '' : ' field-empty' ?>" value="<?= e($settings['site_phone']) ?>" placeholder="+1 (555) 000-0000">
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3 class="card-title">System Status</h3>
+          <p class="card-desc">Current configuration — updates live as you edit</p>
+          <div class="config-summary">
+            <div class="stat"><div class="stat-label">Site Name</div><div class="stat-value" data-summary="site_name"><?= e($settings['site_name']) ?></div></div>
+            <div class="stat"><div class="stat-label">Contact Email</div><div class="stat-value" data-summary="site_email"><?= $settings['site_email'] !== '' ? e($settings['site_email']) : 'Not set' ?></div></div>
+            <div class="stat"><div class="stat-label">Registrations</div><div class="stat-value" data-summary="allow_registration"><?= $settings['allow_registration'] === '1' ? 'Enabled' : 'Disabled' ?></div></div>
+            <div class="stat"><div class="stat-label">Email Alerts</div><div class="stat-value" data-summary="email_notifications"><?= $settings['email_notifications'] === '1' ? 'Enabled' : 'Disabled' ?></div></div>
+            <div class="stat"><div class="stat-label">Session Timeout</div><div class="stat-value" data-summary="session_timeout"><?= e($settings['session_timeout']) ?> min</div></div>
+            <div class="stat"><div class="stat-label">Maintenance</div><div class="stat-value<?= $settings['maintenance_mode'] === '1' ? ' off' : ' on' ?>" data-summary="maintenance_mode"><?= $settings['maintenance_mode'] === '1' ? 'ON' : 'OFF' ?></div></div>
           </div>
         </div>
 
@@ -238,12 +311,20 @@ $settings = array_merge($defaults, $settings);
           <p class="card-desc">Default settings for new internships</p>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Default Duration (months)</label>
-              <input type="number" name="default_internship_duration" class="form-control" value="<?= e($settings['default_internship_duration']) ?>" min="1" max="24">
+              <label class="form-label">Default Duration</label>
+              <div class="input-unit">
+                <input type="number" name="default_internship_duration" class="form-control" value="<?= e($settings['default_internship_duration']) ?>" min="1" max="24" step="1">
+                <span class="unit">months</span>
+              </div>
+              <p class="form-hint">1—24 months</p>
             </div>
             <div class="form-group">
               <label class="form-label">Max Internships Per Student</label>
-              <input type="number" name="max_internships_per_student" class="form-control" value="<?= e($settings['max_internships_per_student']) ?>" min="1" max="20">
+              <div class="input-unit">
+                <input type="number" name="max_internships_per_student" class="form-control" value="<?= e($settings['max_internships_per_student']) ?>" min="1" max="20" step="1">
+                <span class="unit">max</span>
+              </div>
+              <p class="form-hint">1—20 internships</p>
             </div>
           </div>
         </div>
@@ -291,12 +372,20 @@ $settings = array_merge($defaults, $settings);
           <p class="card-desc">Configure session timeout and login security</p>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Session Timeout (minutes)</label>
-              <input type="number" name="session_timeout" class="form-control" value="<?= e($settings['session_timeout']) ?>" min="5" max="480">
+              <label class="form-label">Session Timeout</label>
+              <div class="input-unit">
+                <input type="number" name="session_timeout" class="form-control" value="<?= e($settings['session_timeout']) ?>" min="5" max="480" step="5">
+                <span class="unit">min</span>
+              </div>
+              <p class="form-hint">5—480 minutes of inactivity before logout</p>
             </div>
             <div class="form-group">
               <label class="form-label">Max Login Attempts</label>
-              <input type="number" name="max_login_attempts" class="form-control" value="<?= e($settings['max_login_attempts']) ?>" min="3" max="10">
+              <div class="input-unit">
+                <input type="number" name="max_login_attempts" class="form-control" value="<?= e($settings['max_login_attempts']) ?>" min="3" max="10" step="1">
+                <span class="unit">tries</span>
+              </div>
+              <p class="form-hint">3—10 attempts before the account is locked</p>
             </div>
           </div>
         </div>
@@ -316,14 +405,17 @@ $settings = array_merge($defaults, $settings);
             <div class="toggle <?= $settings['maintenance_mode']?'active':'' ?>" data-toggle="maintenance_mode"></div>
             <input type="hidden" name="maintenance_mode" value="<?= e($settings['maintenance_mode'] ?? '') ?>">
           </div>
+          <p class="danger-note"><i class="fa-solid fa-circle-exclamation"></i> Takes effect for all users as soon as you click <strong>Save Changes</strong>.</p>
 
           <div class="form-group">
             <label class="form-label">Maintenance Message</label>
-            <textarea name="maintenance_message" class="form-control" placeholder="We'll be back soon!"><?= e($settings['maintenance_message']) ?></textarea>
+            <textarea name="maintenance_message" class="form-control<?= $settings['maintenance_message'] !== '' ? '' : ' field-empty' ?>" placeholder="We'll be back soon!"><?= e($settings['maintenance_message']) ?></textarea>
+            <p class="form-hint">Shown to all visitors while maintenance mode is active. Leave blank to use the default message.</p>
           </div>
         </div>
       </div>
     </form>
+    </div>
   </main>
 </div>
 
@@ -350,28 +442,126 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// Toggle handlers
+// --- Confirm dialog for high-impact actions ---
+function showConfirm(opts) {
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML =
+    '<div class="confirm-box">' +
+      '<div class="confirm-title"><i class="fa-solid fa-triangle-exclamation"></i>' + (opts.title || 'Are you sure?') + '</div>' +
+      '<div class="confirm-msg">' + (opts.msg || '') + '</div>' +
+      '<div class="confirm-actions">' +
+        '<button class="btn btn-secondary" data-act="cancel">Cancel</button>' +
+        '<button class="btn btn-danger" data-act="ok">' + (opts.confirmLabel || 'Confirm') + '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-act="cancel"]').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('[data-act="ok"]').addEventListener('click', () => { overlay.remove(); if (opts.onConfirm) opts.onConfirm(); });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// --- Unsaved-changes tracking ---
+const settingsForm = document.getElementById('settings-form');
+const saveBtn = document.getElementById('save-btn');
+const unsavedPill = document.getElementById('unsaved-pill');
+const tabButtons = [...document.querySelectorAll('.tab-btn')];
+const dirtyTabs = new Set();
+let saving = false;
+let hasSaved = false;
+
+function tabOf(field) {
+  const content = field.closest('.tab-content');
+  return content ? content.dataset.tab : null;
+}
+
+function refreshSaveState() {
+  const dirty = dirtyTabs.size > 0;
+  const disabled = saving || (!dirty && hasSaved);
+  saveBtn.classList.toggle('pulse', dirty && !saving);
+  saveBtn.disabled = disabled;
+  saveBtn.title = saving ? 'Saving your changes…' : dirty ? 'Save your unsaved changes' : (hasSaved ? 'All changes saved' : 'Your settings are up to date');
+  unsavedPill.classList.toggle('visible', dirty);
+  tabButtons.forEach(b => b.classList.toggle('dirty', dirtyTabs.has(b.dataset.tab)));
+  updateSummary();
+}
+
+function markDirty(field) {
+  const tab = tabOf(field);
+  if (tab) dirtyTabs.add(tab);
+  refreshSaveState();
+}
+
+// --- Live System Status summary (reads the form) ---
+function updateSummary() {
+  const val = name => {
+    const f = settingsForm.querySelector('[name="' + name + '"]');
+    return f ? f.value : '';
+  };
+  const stats = {
+    site_name: { text: () => val('site_name') || 'Not set' },
+    site_email: { text: () => val('site_email') || 'Not set' },
+    allow_registration: { text: () => val('allow_registration') === '1' ? 'Enabled' : 'Disabled', on: () => val('allow_registration') === '1' },
+    email_notifications: { text: () => val('email_notifications') === '1' ? 'Enabled' : 'Disabled', on: () => val('email_notifications') === '1' },
+    session_timeout: { text: () => val('session_timeout') ? val('session_timeout') + ' min' : 'Not set' },
+    maintenance_mode: { text: () => val('maintenance_mode') === '1' ? 'ON' : 'OFF', on: () => val('maintenance_mode') !== '1' }
+  };
+  Object.keys(stats).forEach(key => {
+    const el = document.querySelector('[data-summary="' + key + '"]');
+    if (!el) return;
+    el.textContent = stats[key].text();
+    el.className = 'stat-value';
+    if (stats[key].on !== undefined) el.classList.add(stats[key].on() ? 'on' : 'off');
+  });
+}
+
+// Listen for edits on every field
+settingsForm.querySelectorAll('input, select, textarea').forEach(f => {
+  if (f.type === 'hidden') return;
+  f.addEventListener('input', () => markDirty(f));
+  f.addEventListener('change', () => markDirty(f));
+});
+
+// Toggle handlers (fixed: locate the paired hidden input via the toggle-group)
 document.querySelectorAll('.toggle').forEach(toggle => {
   toggle.addEventListener('click', function() {
-    this.classList.toggle('active');
-    const input = this.nextElementSibling.nextElementSibling;
-    if (input && input.tagName === 'INPUT') {
-      input.value = this.classList.contains('active') ? '1' : '0';
+    const group = this.closest('.toggle-group');
+    const input = group ? group.querySelector('input[type="hidden"]') : null;
+    const turningOn = !this.classList.contains('active');
+    if (this.dataset.toggle === 'maintenance_mode' && turningOn) {
+      showConfirm({
+        title: 'Enable Maintenance Mode?',
+        msg: 'This will make the site inaccessible to all users until you turn it off. Are you sure you want to continue?',
+        confirmLabel: 'Enable',
+        onConfirm: () => { setToggle(this, input); }
+      });
+      return;
     }
+    setToggle(this, input);
   });
 });
 
+function setToggle(toggle, input) {
+  toggle.classList.toggle('active');
+  if (input) input.value = toggle.classList.contains('active') ? '1' : '0';
+  markDirty(input || toggle);
+}
+
 // Initialize toggles from hidden inputs
 document.querySelectorAll('.toggle').forEach(toggle => {
-  const input = toggle.nextElementSibling.nextElementSibling;
-  if (input && input.tagName === 'INPUT' && input.value === '1') {
-    toggle.classList.add('active');
-  }
+  const group = toggle.closest('.toggle-group');
+  const input = group ? group.querySelector('input[type="hidden"]') : null;
+  if (input && input.value === '1') toggle.classList.add('active');
 });
 
 // Form submit
 document.getElementById('settings-form').addEventListener('submit', async e => {
   e.preventDefault();
+  if (saving) return;
+  saving = true;
+  saveBtn.classList.add('saving');
+  refreshSaveState();
+
   const fd = new FormData(e.target);
   fd.append('action', 'save_settings');
   fd.append('csrf_token', App.csrfToken);
@@ -380,10 +570,20 @@ document.getElementById('settings-form').addEventListener('submit', async e => {
     const res = await fetch('admin.php', { method: 'POST', body: fd });
     const data = await res.json();
     toast(data.message, data.success ? 'success' : 'error');
+    if (data.success) {
+      dirtyTabs.clear();
+      hasSaved = true;
+    }
   } catch(err) {
     toast('Error: ' + err.message, 'error');
+  } finally {
+    saving = false;
+    saveBtn.classList.remove('saving');
+    refreshSaveState();
   }
 });
+
+updateSummary();
 
 async function handleLogout() {
   await fetch('auth.php', { method: 'POST', body: new URLSearchParams({ action: 'logout' }) });

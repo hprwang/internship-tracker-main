@@ -22,6 +22,9 @@ switch ($action) {
     case 'send_otp':
         handleSendOtp();
         break;
+    case 'verify_otp':
+        handleVerifyOtp();
+        break;
     case 'forgot_request':
         handleForgotRequest();
         break;
@@ -78,6 +81,11 @@ function handleLogin(): void {
 
     // Regenerate session ID on login (prevent fixation)
     session_regenerate_id(true);
+
+    // Remember me: extend the session cookie lifetime to 30 days
+    if (!empty($_POST['remember_me'])) {
+        setcookie(session_name(), session_id(), time() + 30 * 24 * 3600, '/', '', false, true);
+    }
 
     $sessionUser = [
         'id' => (int)$user['id'],
@@ -149,6 +157,7 @@ function handleRegister(): void {
     // Require a verified OTP before the account can be created
     if ($requireOtp) {
         ensureEmailVerification();
+        if (empty($_POST['tos'])) jsonResponse(false, 'Please accept the Terms of Service and Privacy Policy.');
         if (!preg_match('/^\d{6}$/', $otp)) jsonResponse(false, 'Enter the 6-digit verification code sent to your email.');
         if (!verifyOtpCode($email, $otp)) jsonResponse(false, 'Invalid or expired verification code. Please click Send Code and try again.');
     }
@@ -193,6 +202,26 @@ function handleRegister(): void {
 
     $message = 'Account created successfully! You can now log in.';
     jsonResponse(true, $message);
+}
+
+/**
+ * Standalone OTP check used by the "Verify" button on the registration page.
+ * Confirms the code is valid without consuming it (it is consumed at signup).
+ */
+function handleVerifyOtp(): void {
+    $email = trim($_POST['email'] ?? '');
+    $otp   = trim($_POST['otp'] ?? '');
+    $csrf  = $_POST['csrf_token'] ?? '';
+
+    if (!verifyCSRF($csrf)) jsonResponse(false, 'Invalid request token.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonResponse(false, 'Invalid email address.');
+    if (!preg_match('/^\d{6}$/', $otp)) jsonResponse(false, 'Enter the 6-digit verification code sent to your email.');
+
+    ensureEmailVerification();
+    if (!verifyOtpCode($email, $otp)) {
+        jsonResponse(false, 'Invalid or expired verification code. Please click Send Code and try again.');
+    }
+    jsonResponse(true, 'Email verified!');
 }
 
 /**
@@ -293,7 +322,7 @@ function handleForgotRequest(): void {
     // Always return the same message to avoid user-enumeration
     $genericMsg = 'If your email is registered, a reset link has been sent. Please check your inbox (and spam folder).';
 
-    // Rate limit per email Ã¢â‚¬â€ 3 requests per 60 seconds
+    // Rate limit per email … 3 requests per 60 seconds
     $rateKey = 'forgot_' . md5(strtolower($email));
     if (!checkRateLimit($rateKey, 3, 60)) {
         jsonResponse(true, $genericMsg);  // Still return success to avoid revealing rate limit
@@ -329,9 +358,9 @@ function handleForgotRequest(): void {
                       . "Click the link below to choose a new password:\n"
                       . "{$resetUrl}\n\n"
                       . "This link will expire in 1 hour.\n\n"
-                      . "If you did not request a password reset, you can safely ignore this email Ã¢â‚¬â€ "
+                      . "If you did not request a password reset, you can safely ignore this email … "
                       . "your password will remain unchanged.\n\n"
-                      . "Ã¢â‚¬â€ The {$appName} Team";
+                      . "… The {$appName} Team";
 
             // HTML body
             $bodyHtml = "

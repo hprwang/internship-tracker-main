@@ -481,8 +481,14 @@ async function handleLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('login-btn');
   if (!btn) return;
-  btn.textContent = 'Signing in…';
-  btn.disabled = true;
+  const label = btn.querySelector('.btn-label');
+  const spinner = btn.querySelector('.btn-spinner');
+  function setLoading(loading) {
+    btn.disabled = loading;
+    if (spinner) spinner.style.display = loading ? 'inline-block' : 'none';
+    if (label) label.textContent = loading ? 'Logging in…' : 'Log In';
+  }
+  setLoading(true);
 
   try {
     const fd = new FormData(e.target);
@@ -493,8 +499,7 @@ async function handleLogin(e) {
     const username = fd.get('username');
     if (!username || !username.trim()) {
       toast('Username is required.', 'error');
-      btn.textContent = 'Sign In';
-      btn.disabled = false;
+      setLoading(false);
       return;
     }
 
@@ -504,8 +509,7 @@ async function handleLogin(e) {
     const res = await fetch(authPath, { method: 'POST', body: fd });
     if (!res.ok) {
       toast('Server error: ' + res.status, 'error');
-      btn.textContent = 'Sign In';
-      btn.disabled = false;
+      setLoading(false);
       return;
     }
 
@@ -517,13 +521,11 @@ async function handleLogin(e) {
       }, 800);
     } else {
       toast(data.message || 'Invalid username or password.', 'error');
-      btn.textContent = 'Sign In';
-      btn.disabled = false;
+      setLoading(false);
     }
   } catch(err) {
     toast('Network error. Check your connection.', 'error');
-    btn.textContent = 'Sign In';
-    btn.disabled = false;
+    setLoading(false);
   }
 }
 
@@ -592,6 +594,7 @@ async function handleRegister(e) {
         const pwMatch    = document.getElementById('pw-match-msg');
         if (pwStrength) pwStrength.style.display = 'none';
         if (pwMatch)    pwMatch.textContent = '';
+        if (typeof resetEmailVerificationState === 'function') resetEmailVerificationState();
         setTimeout(() => {
           if (typeof switchTab === 'function') switchTab('login');
           else window.location.reload();
@@ -650,20 +653,41 @@ function updatePasswordStrength(val) {
   bars.forEach((b, i) => { if (b) b.style.background = i < score ? colors[score-1] : 'var(--border)'; });
   label.textContent = score > 0 ? labels[score-1] : '';
   label.style.color = score > 0 ? colors[score-1] : 'var(--muted)';
+  setPwRequirement('req-len', val.length >= 8);
+  setPwRequirement('req-up',  /[A-Z]/.test(val));
+  setPwRequirement('req-num', /[0-9]/.test(val));
   checkPasswordMatch();
+}
+
+function setPwRequirement(id, met) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('met', met);
+  el.innerHTML = met
+    ? '<i class="fas fa-check-circle"></i>'
+    : '<i class="far fa-circle"></i>';
 }
 
 function checkPasswordMatch() {
   const pw      = document.getElementById('reg-password')?.value || '';
   const confirm = document.getElementById('reg-confirm')?.value  || '';
+  const input   = document.getElementById('reg-confirm');
   const msg     = document.getElementById('pw-match-msg');
-  if (!msg || !confirm) return;
+  if (!msg) return;
+  if (!confirm) {
+    if (input) input.classList.remove('valid', 'invalid');
+    msg.textContent = '';
+    msg.className = '';
+    return;
+  }
   if (pw === confirm) {
+    if (input) { input.classList.remove('invalid'); input.classList.add('valid'); }
     msg.textContent = '✓ Passwords match';
-    msg.style.color = '#22C55E';
+    msg.className = 'field-feedback success';
   } else {
+    if (input) { input.classList.remove('valid'); input.classList.add('invalid'); }
     msg.textContent = '✕ Passwords do not match';
-    msg.style.color = '#EF4444';
+    msg.className = 'field-feedback error';
   }
 }
 

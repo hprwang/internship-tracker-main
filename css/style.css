@@ -961,3 +961,25 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 @media (prefers-reduced-motion: reduce){
   #starfield{ filter: none; }
 }
+
+/* ── Analytics skeleton / error / chart layout (shared by dashboards) ── */
+.analytics-skeleton{ display:flex; flex-direction:column; gap:1.25rem; }
+.sk-bar{ height:14px; border-radius:6px; background:linear-gradient(90deg,#1A1A1A 25%,#161616 50%,#1A1A1A 75%); background-size:200% 100%; animation:shimmer 1.4s infinite linear; }
+.sk-row{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:1.25rem; }
+.sk-chart{ height:220px; border-radius:12px; background:linear-gradient(90deg,#1A1A1A 25%,#161616 50%,#1A1A1A 75%); background-size:200% 100%; animation:shimmer 1.4s infinite linear; }
+.analytics-chart-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; }
+.chart-panel{ background:#1A1A1A; border:1px solid #222222; border-radius:12px; padding:1rem 1.1rem; display:flex; flex-direction:column; }
+.chart-title{ font-size:.8rem; font-weight:600; color:#D4D4D8; letter-spacing:.02em; margin:0 0 .85rem; }
+.chart-wrap{ position:relative; flex:1; min-height:230px; }
+.chart-wrap canvas{ width:100% !important; height:100% !important; }
+.chart-wrap-square{ max-width:260px; width:100%; margin:0 auto; min-height:230px; }
+.chart-empty{ display:flex; align-items:center; justify-content:center; min-height:230px; padding:1.25rem; text-align:center; color:#71717A; font-size:.8rem; line-height:1.6; border:1px dashed #2A2A2A; border-radius:10px; background:#161616; }
+.analytics-error{ padding:2.5rem 1.5rem; text-align:center; color:#A1A1AA; border:1px dashed #2A2A2A; border-radius:12px; background:#1A1A1A; }
+.analytics-error .err-icon{ font-size:1.75rem; color:#F59E0B; margin-bottom:0.75rem; }
+.analytics-error p{ font-size:0.85rem; margin-bottom:1rem; }
+@media (max-width:900px){
+  .sk-row, .analytics-chart-grid{ grid-template-columns:1fr; }
+}
+@media (prefers-reduced-motion: reduce){
+  .sk-bar, .sk-chart{ animation:none; }
+}

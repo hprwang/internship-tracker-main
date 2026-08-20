@@ -73,7 +73,7 @@ $dashboardData = json_encode([
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=3">
   <link rel="stylesheet" href="css/responsive.css">
   <style>
     :root {
@@ -1065,16 +1065,6 @@ $dashboardData = json_encode([
           </table>
         </div>
       </div>
-
-      <!-- Analytics Charts -->
-      <div class="dash-card" style="margin-top:1.5rem;">
-        <div class="dash-card-header">
-          <h3 class="dash-card-title">Analytics</h3>
-        </div>
-        <div class="dash-card-body" id="analyticsCharts">
-          <div class="loading-message">Loading...</div>
-        </div>
-      </div>
     </main>
   </div>
   <!-- Internship Add/Edit Modal -->
@@ -1266,8 +1256,6 @@ $dashboardData = json_encode([
 
   <script src="js/interactive.js"></script>
   <script src="js/notifications.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="js/analytics.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

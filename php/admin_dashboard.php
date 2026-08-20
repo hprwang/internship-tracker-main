@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 require_once __DIR__ . '/config.php';
 $user = requireAuth();
@@ -26,6 +26,12 @@ $completedInternships = $db->query("SELECT COUNT(*) as c FROM company_internship
 $pendingApps = $db->query("SELECT COUNT(*) as c FROM company_internships WHERE status = 'pending'")->fetch()['c'] ?? 0;
 $totalApplicants = $db->query("SELECT COUNT(*) as c FROM applications")->fetch()['c'] ?? 0;
 
+// Analytics KPI values (same data sources as php/analytics.php) so the block is never empty/stuck
+$kpiStudents     = (int)$db->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn();
+$kpiCompanies    = (int)$db->query("SELECT COUNT(*) FROM companies")->fetchColumn();
+$kpiInternships  = (int)$db->query("SELECT COUNT(*) FROM internships")->fetchColumn();
+$kpiApplications = (int)$db->query("SELECT COUNT(*) FROM applications")->fetchColumn();
+
 // Get recent students
 $recentStudents = $db->query("SELECT u.id, u.full_name, u.email, u.created_at, (SELECT COUNT(*) FROM internships WHERE student_id = u.id) as internship_count FROM users u WHERE u.role = 'student' ORDER BY u.created_at DESC LIMIT 5")->fetchAll();
 
@@ -47,10 +53,10 @@ $recentInternships = $db->query("
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="<?= e($csrf) ?>">
-  <title>InternTrack — Admin Dashboard</title>
+  <title>InternTrack &mdash; Admin Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css?v=3">
   <link rel="stylesheet" href="../css/responsive.css">
   <!-- Modal overlay styles (after style.css to override) -->
   <style>
@@ -116,7 +122,7 @@ $recentInternships = $db->query("
     .user-chip:hover { border-color: var(--green-neon); }
     .user-avatar { width: 36px; height: 36px; background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem; color: var(--bg-deep); }
     .user-info { flex: 1; min-width: 0; }
-    .user-name { font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-name { font-size: 0.875rem; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
     .user-role { font-size: 0.7rem; color: var(--text-muted); }
     .logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0.875rem; border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.875rem; cursor: pointer; transition: all var(--transition); border: 1px solid var(--border-subtle); background: transparent; width: 100%; margin-top: 0.5rem; }
     .logout-btn:hover { border-color: rgba(239,68,68,0.4); color: #F87171; background: rgba(239,68,68,0.08); transform: translateX(2px); }
@@ -138,7 +144,12 @@ $recentInternships = $db->query("
     .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
 
     /* Stats Grid */
-    .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 2rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .stats-section { margin-bottom: 1.25rem; }
+    .stats-section:last-child { margin-bottom: 2rem; }
+    .stats-subheader { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
+    .stats-subtitle { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
+    .stats-subheader::before { content: ''; width: 20px; height: 2px; background: var(--green-neon); border-radius: 2px; }
     .stat-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.5rem; transition: all var(--transition); position: relative; overflow: hidden; animation: cardSlideIn 0.5s ease-out backwards; }
     .stat-card:nth-child(1) { animation-delay: 0.05s; }
     .stat-card:nth-child(2) { animation-delay: 0.1s; }
@@ -179,7 +190,7 @@ $recentInternships = $db->query("
     .dash-card-body { padding: 0; }
 
     .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th { text-align: left; padding: 0.875rem 1.25rem; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); }
+    .data-table th { text-align: left; padding: 0.875rem 1.25rem; font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); }
     .data-table td { padding: 1rem 1.25rem; font-size: 0.875rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); transition: background var(--transition); }
     .data-table tr:last-child td { border-bottom: none; }
     .data-table tbody tr { transition: all var(--transition); }
@@ -192,6 +203,65 @@ $recentInternships = $db->query("
     .status-badge.pending { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); }
     .status-badge.completed { background: rgba(96,165,250,0.12); color: #60A5FA; border: 1px solid rgba(96,165,250,0.25); }
     .status-badge.rejected { background: rgba(239,68,68,0.12); color: #F87171; border: 1px solid rgba(239,68,68,0.25); }
+    .status-badge.applicant-badge { background: rgba(139,92,246,0.12); color: #A78BFA; border: 1px solid rgba(139,92,246,0.25); }
+
+    /* Checkbox columns + bulk action bar */
+    .col-check { width: 42px; text-align: center; }
+    .col-check input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border: 1.5px solid var(--border-light); border-radius: 5px; background: var(--bg-panel); cursor: pointer; transition: all 0.15s ease; position: relative; vertical-align: middle; }
+    .col-check input[type="checkbox"]:hover { border-color: var(--green-neon); }
+    .col-check input[type="checkbox"]:checked { background: var(--green-neon); border-color: var(--green-neon); }
+    .col-check input[type="checkbox"]:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 5px; height: 9px; border: solid #050505; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    .col-check input[type="checkbox"]:focus-visible { outline: 2px solid rgba(34,197,94,0.4); outline-offset: 1px; }
+    .bulk-bar { display: none; align-items: center; gap: 0.75rem; padding: 0.6rem 1.25rem; background: rgba(34,197,94,0.08); border-bottom: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--green-neon); }
+    .bulk-bar.visible { display: flex; }
+    .bulk-count { font-weight: 700; }
+    .bulk-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+    .btn-bulk-delete { background: rgba(239,68,68,0.15); color: #F87171; border: 1px solid rgba(239,68,68,0.35); }
+    .btn-bulk-delete:hover { background: rgba(239,68,68,0.25); box-shadow: 0 0 12px rgba(239,68,68,0.25); transform: translateY(-1px); }
+
+    /* Full-width dashboard card (internship posts) */
+    .span-all { grid-column: 1 / -1; }
+
+    /* Table cell truncation */
+    .text-truncate { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .table-scroll { overflow-x: auto; overflow-y: auto; max-height: 340px; }
+    .table-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+    .table-scroll::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 8px; }
+    .table-scroll::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+    .data-table { width: 100%; }
+    .pos-duration { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.7rem; font-weight: 500; margin-top: 0.2rem; }
+    .pos-duration i { font-size: 0.6rem; color: var(--green-neon); }
+
+    /* Analytics skeleton + error states */
+    .analytics-skeleton { display: flex; flex-direction: column; gap: 1.25rem; }
+    .sk-bar { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-card) 50%, var(--bg-elevated) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+    .sk-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+    .sk-chart { height: 220px; border-radius: var(--radius-md); background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-card) 50%, var(--bg-elevated) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+    .analytics-chart-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .chart-panel { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem 1.1rem; display: flex; flex-direction: column; }
+    .chart-title { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.02em; margin: 0 0 0.85rem; }
+    .chart-wrap { position: relative; flex: 1; min-height: 230px; }
+    .chart-wrap canvas { width: 100% !important; height: 100% !important; }
+    .chart-wrap-square { max-width: 260px; width: 100%; margin: 0 auto; min-height: 230px; }
+    .chart-empty { display: flex; align-items: center; justify-content: center; min-height: 230px; padding: 1.25rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; line-height: 1.6; border: 1px dashed var(--border-light); border-radius: 10px; background: var(--bg-card); }
+    .analytics-error { padding: 2.5rem 1.5rem; text-align: center; color: var(--text-secondary); border: 1px dashed var(--border-light); border-radius: var(--radius-md); background: var(--bg-elevated); }
+    .analytics-error .err-icon { font-size: 1.75rem; color: #F59E0B; margin-bottom: 0.75rem; }
+    .analytics-error p { font-size: 0.85rem; margin-bottom: 1rem; }
+    @media (max-width: 900px) { .sk-row, .analytics-chart-grid { grid-template-columns: 1fr; } }
+
+    /* Refresh button spinner */
+    .btn .fa-sync-alt { transition: transform var(--transition); }
+    .btn.spinning .fa-sync-alt { animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Confirmation dialog (bulk delete) */
+    .confirm-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.75); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .confirm-box { background: var(--bg-card); border: 1px solid rgba(239,68,68,0.4); border-radius: var(--radius-lg); padding: 1.5rem; max-width: 420px; width: 100%; box-shadow: var(--shadow-soft); }
+    .confirm-box .confirm-title { font-size: 1.05rem; font-weight: 700; color: #F87171; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+    .confirm-box .confirm-msg { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+    .confirm-actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
+    .btn-danger { background: #EF4444; color: #fff; }
+    .btn-danger:hover { background: #F87171; box-shadow: 0 0 18px rgba(239,68,68,0.4); transform: translateY(-1px); }
 
     /* Toast */
     .toast-container { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -253,53 +323,63 @@ $recentInternships = $db->query("
       </div>
       <div class="header-actions">
         <?= renderNotifBell($user) ?>
-        <button class="btn btn-secondary" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button class="btn btn-secondary" id="refresh-btn" onclick="handleRefresh(event)"><i class="fas fa-sync-alt"></i> Refresh</button>
       </div>
     </div>
 
-    <!-- Stats Grid -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-header">
-          <span class="stat-label">Total Students</span>
-          <div class="stat-icon"><i class="fas fa-users"></i></div>
+    <!-- Entity stats -->
+    <div class="stats-section">
+      <div class="stats-subheader"><span class="stats-subtitle">Platform Entities</span></div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Total Students</span>
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+          </div>
+          <div class="stat-value"><?= $totalStudents ?></div>
         </div>
-        <div class="stat-value"><?= $totalStudents ?></div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Companies</span>
+            <div class="stat-icon"><i class="fas fa-building"></i></div>
+          </div>
+          <div class="stat-value"><?= $totalCompanies ?></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Total Applicants</span>
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+          </div>
+          <div class="stat-value" style="color:#22C55E"><?= $totalApplicants ?></div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-header">
-          <span class="stat-label">Companies</span>
-          <div class="stat-icon"><i class="fas fa-building"></i></div>
+    </div>
+
+    <!-- Internship status stats -->
+    <div class="stats-section">
+      <div class="stats-subheader"><span class="stats-subtitle">Internship Status</span></div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Active Internships</span>
+            <div class="stat-icon"><i class="fas fa-bolt"></i></div>
+          </div>
+          <div class="stat-value active"><?= $activeInternships ?></div>
         </div>
-        <div class="stat-value"><?= $totalCompanies ?></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-header">
-          <span class="stat-label">Active</span>
-          <div class="stat-icon"><i class="fas fa-bolt"></i></div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Completed Internships</span>
+            <div class="stat-icon"><i class="fas fa-check"></i></div>
+          </div>
+          <div class="stat-value" style="color:#60A5FA"><?= $completedInternships ?></div>
         </div>
-        <div class="stat-value active"><?= $activeInternships ?></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-header">
-          <span class="stat-label">Completed</span>
-          <div class="stat-icon"><i class="fas fa-check"></i></div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Pending Internships</span>
+            <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
+          </div>
+          <div class="stat-value" style="color:#F59E0B"><?= $pendingApps ?></div>
         </div>
-        <div class="stat-value" style="color:#60A5FA"><?= $completedInternships ?></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-header">
-          <span class="stat-label">Pending</span>
-          <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
-        </div>
-        <div class="stat-value" style="color:#F59E0B"><?= $pendingApps ?></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-header">
-          <span class="stat-label">Total Applicants</span>
-          <div class="stat-icon"><i class="fas fa-users"></i></div>
-        </div>
-        <div class="stat-value" style="color:#22C55E"><?= $totalApplicants ?></div>
       </div>
     </div>
 
@@ -309,19 +389,22 @@ $recentInternships = $db->query("
       <div class="dash-card">
         <div class="dash-card-header">
           <h3 class="dash-card-title">Recent Students</h3>
-          <a href="admin_students.php" class="dash-card-link">View All →</a>
+          <a href="admin_students.php" class="dash-card-link">View All <i class="fas fa-arrow-right"></i></a>
         </div>
+        <div class="bulk-bar" data-bulkbar="students"><span class="bulk-count">0</span> selected<div class="bulk-actions"><button type="button" class="btn btn-sm btn-bulk-delete bulk-delete"><i class="fas fa-trash-alt"></i> Delete Selected</button></div></div>
         <div class="dash-card-body">
-          <table class="data-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Internships</th></tr></thead>
+          <div class="table-scroll">
+          <table class="data-table" data-bulk="students" data-no-bulk>
+            <thead><tr><th class="col-check"><input type="checkbox" class="check-all" aria-label="Select all"></th><th>Name</th><th>Email</th><th>Internships</th></tr></thead>
             <tbody>
               <?php if($recentStudents): foreach($recentStudents as $s): ?>
-              <tr><td><?= e($s['full_name']) ?></td><td><?= e($s['email']) ?></td><td><?= $s['internship_count'] ?></td></tr>
+              <tr><td class="col-check"><input type="checkbox" class="row-check" value="<?= (int)$s['id'] ?>" aria-label="Select row"></td><td class="text-truncate" title="<?= e($s['full_name']) ?>"><?= e($s['full_name']) ?></td><td class="text-truncate" title="<?= e($s['email']) ?>"><?= e($s['email']) ?></td><td><?= $s['internship_count'] ?></td></tr>
               <?php endforeach; else: ?>
-              <tr><td colspan="3" class="empty-message">No students yet</td></tr>
+              <tr><td colspan="4" class="empty-message">No students yet</td></tr>
               <?php endif; ?>
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -329,46 +412,53 @@ $recentInternships = $db->query("
       <div class="dash-card">
         <div class="dash-card-header">
           <h3 class="dash-card-title">Recent Companies</h3>
-          <a href="admin_companies.php" class="dash-card-link">View All →</a>
+          <a href="admin_companies.php" class="dash-card-link">View All <i class="fas fa-arrow-right"></i></a>
         </div>
+        <div class="bulk-bar" data-bulkbar="companies"><span class="bulk-count">0</span> selected<div class="bulk-actions"><button type="button" class="btn btn-sm btn-bulk-delete bulk-delete"><i class="fas fa-trash-alt"></i> Delete Selected</button></div></div>
         <div class="dash-card-body">
-          <table class="data-table">
-            <thead><tr><th>Name</th><th>Industry</th><th>Location</th></tr></thead>
+          <div class="table-scroll">
+          <table class="data-table" data-bulk="companies" data-no-bulk>
+            <thead><tr><th class="col-check"><input type="checkbox" class="check-all" aria-label="Select all"></th><th>Name</th><th>Industry</th><th>Location</th></tr></thead>
             <tbody>
               <?php if($recentCompanies): foreach($recentCompanies as $c): ?>
-              <tr><td><?= e($c['name']) ?></td><td><?= e($c['industry'] ?? '-') ?></td><td><?= e($c['location'] ?? '-') ?></td></tr>
+              <tr><td class="col-check"><input type="checkbox" class="row-check" value="<?= (int)$c['id'] ?>" aria-label="Select row"></td><td class="text-truncate" title="<?= e($c['name']) ?>"><?= e($c['name']) ?></td><td class="text-truncate" title="<?= e($c['industry'] ?? '-') ?>"><?= e($c['industry'] ?? '-') ?></td><td class="text-truncate" title="<?= e($c['location'] ?? '-') ?>"><?= e($c['location'] ?? '-') ?></td></tr>
               <?php endforeach; else: ?>
-              <tr><td colspan="3" class="empty-message">No companies yet</td></tr>
+              <tr><td colspan="4" class="empty-message">No companies yet</td></tr>
               <?php endif; ?>
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
       <!-- Recent Internship Posts -->
-      <div class="dash-card">
+      <div class="dash-card span-all">
         <div class="dash-card-header">
           <h3 class="dash-card-title">Recent Internship Posts</h3>
-          <a href="admin_internships.php" class="dash-card-link">View All →</a>
+          <a href="admin_internships.php" class="dash-card-link">View All <i class="fas fa-arrow-right"></i></a>
         </div>
+        <div class="bulk-bar" data-bulkbar="internships"><span class="bulk-count">0</span> selected<div class="bulk-actions"><button type="button" class="btn btn-sm btn-bulk-delete bulk-delete"><i class="fas fa-trash-alt"></i> Delete Selected</button></div></div>
         <div class="dash-card-body">
-          <table class="data-table">
-            <thead><tr><th>Company</th><th>Position</th><th>Location</th><th>Stipend</th><th>Applicants</th><th>Status</th></tr></thead>
+          <div class="table-scroll">
+          <table class="data-table" data-bulk="internships" data-no-bulk>
+            <thead><tr><th class="col-check"><input type="checkbox" class="check-all" aria-label="Select all"></th><th>Company</th><th>Position</th><th>Location</th><th>Stipend</th><th>Applicants</th><th>Status</th></tr></thead>
             <tbody>
               <?php if($recentInternships): foreach($recentInternships as $i): ?>
               <tr>
-                <td><?= e($i['company_name'] ?? '-') ?></td>
-                <td><?= e($i['title'] ?? '-') ?><br><small style="color:var(--text-muted)"><?= e($i['duration'] ?? '') ?></small></td>
-                <td><?= e($i['location'] ?? '-') ?></td>
+                <td class="col-check"><input type="checkbox" class="row-check" value="<?= (int)$i['id'] ?>" aria-label="Select row"></td>
+                <td class="text-truncate"><?= e($i['company_name'] ?? '-') ?></td>
+                <td class="text-truncate"><?= e($i['title'] ?? '-') ?><?php if (!empty($i['duration'])): ?><br><small class="pos-duration" title="Internship duration in months"><i class="fas fa-clock"></i> <?= e($i['duration']) ?> months</small><?php endif; ?></td>
+                <td class="text-truncate"><?= e($i['location'] ?? '-') ?></td>
                 <td><?= ($i['stipend'] ?? 0) > 0 ? 'NPR ' . number_format((float)$i['stipend']) : '-' ?></td>
-                <td><span class="status-badge"><?= (int)($i['applicant_count'] ?? 0) ?> applicant(s)</span></td>
+                <td><span class="status-badge applicant-badge"><?php $ac = (int)($i['applicant_count'] ?? 0); echo $ac . ' applicant' . ($ac === 1 ? '' : 's'); ?></span></td>
                 <td><span class="status-badge <?= e($i['status'] ?? 'active') ?>"><?= e($i['status'] ?? 'active') ?></span></td>
               </tr>
               <?php endforeach; else: ?>
-              <tr><td colspan="6" class="empty-message">No internship posts yet</td></tr>
+              <tr><td colspan="7" class="empty-message">No internship posts yet</td></tr>
               <?php endif; ?>
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 </div>
@@ -381,24 +471,27 @@ $recentInternships = $db->query("
         <div class="dash-card-body" style="padding:1.5rem;">
           <div id="analyticsKpis" style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;">
             <div style="flex:1;min-width:130px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:1rem;text-align:center;">
-              <div id="kpi-students" style="font-size:1.75rem;font-weight:700;color:#22C55E;">–</div>
+              <div id="kpi-students" style="font-size:1.75rem;font-weight:700;color:#22C55E;"><?= $kpiStudents ?></div>
               <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Students</div>
             </div>
             <div style="flex:1;min-width:130px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:1rem;text-align:center;">
-              <div id="kpi-companies" style="font-size:1.75rem;font-weight:700;color:#3B82F6;">–</div>
+              <div id="kpi-companies" style="font-size:1.75rem;font-weight:700;color:#3B82F6;"><?= $kpiCompanies ?></div>
               <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Companies</div>
             </div>
             <div style="flex:1;min-width:130px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:1rem;text-align:center;">
-              <div id="kpi-internships" style="font-size:1.75rem;font-weight:700;color:#F59E0B;">–</div>
+              <div id="kpi-internships" style="font-size:1.75rem;font-weight:700;color:#F59E0B;"><?= $kpiInternships ?></div>
               <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Internships</div>
             </div>
             <div style="flex:1;min-width:130px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:1rem;text-align:center;">
-              <div id="kpi-applications" style="font-size:1.75rem;font-weight:700;color:#8B5CF6;">–</div>
+              <div id="kpi-applications" style="font-size:1.75rem;font-weight:700;color:#8B5CF6;"><?= $kpiApplications ?></div>
               <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Applications</div>
             </div>
           </div>
           <div id="analyticsCharts">
-            <div class="loading-message">Loading...</div>
+            <div class="analytics-skeleton">
+              <div class="sk-bar"></div>
+              <div class="sk-row"><div class="sk-chart"></div><div class="sk-chart"></div><div class="sk-chart"></div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -489,9 +582,103 @@ async function handleLogout() {
     window.location.href = '../index.php';
   }
 }
+
+// Confirmation dialog for bulk deletes
+function showConfirm(msg, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML =
+    '<div class="confirm-box">' +
+      '<div class="confirm-title"><i class="fa-solid fa-triangle-exclamation"></i> Confirm deletion</div>' +
+      '<div class="confirm-msg">' + msg + '</div>' +
+      '<div class="confirm-actions">' +
+        '<button type="button" class="btn btn-secondary" data-act="cancel">Cancel</button>' +
+        '<button type="button" class="btn btn-danger" data-act="ok"><i class="fas fa-trash-alt"></i> Delete</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-act="cancel"]').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('[data-act="ok"]').addEventListener('click', () => { overlay.remove(); onConfirm(); });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// Bulk row selection + select-all
+const BULK_ACTIONS = {
+  students:    { endpoint: 'admin.php',             action: 'delete_student' },
+  companies:   { endpoint: 'admin.php',             action: 'delete_company' },
+  internships: { endpoint: 'admin_internships.php', action: 'delete' }
+};
+
+function setupBulkTable(key) {
+  const table = document.querySelector('.data-table[data-bulk="' + key + '"]');
+  if (!table) return;
+  const allBox = table.querySelector('.check-all');
+  const bar = document.querySelector('[data-bulkbar="' + key + '"]');
+  if (!bar) return;
+  const countEl = bar.querySelector('.bulk-count');
+  const delBtn = bar.querySelector('.bulk-delete');
+  const cfg = BULK_ACTIONS[key];
+
+  function refresh() {
+    const boxes = [...table.querySelectorAll('.row-check')];
+    const sel = boxes.filter(b => b.checked);
+    allBox.checked = boxes.length > 0 && sel.length === boxes.length;
+    allBox.indeterminate = sel.length > 0 && sel.length < boxes.length;
+    bar.classList.toggle('visible', sel.length > 0);
+    countEl.textContent = sel.length;
+  }
+
+  allBox.addEventListener('change', () => {
+    table.querySelectorAll('.row-check').forEach(b => { b.checked = allBox.checked; });
+    refresh();
+  });
+  table.querySelectorAll('.row-check').forEach(b => b.addEventListener('change', refresh));
+
+  delBtn.addEventListener('click', () => {
+    const sel = [...table.querySelectorAll('.row-check:checked')].map(b => b.value);
+    if (!sel.length) return;
+    const plural = sel.length > 1 ? 's' : '';
+    showConfirm('Delete ' + sel.length + ' selected item' + plural + '? This cannot be undone.', async () => {
+      delBtn.disabled = true;
+      for (const id of sel) {
+        await fetch(cfg.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ action: cfg.action, id: id, csrf_token: App.csrfToken })
+        });
+      }
+      toast('Deleted ' + sel.length + ' item' + plural + '.', 'success');
+      setTimeout(() => location.reload(), 400);
+    });
+  });
+}
+Object.keys(BULK_ACTIONS).forEach(setupBulkTable);
+
+// Refresh button: spinner + disabled while refreshing
+function handleRefresh(e) {
+  const btn = e.currentTarget;
+  if (btn.classList.contains('spinning')) return;
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  setTimeout(() => location.reload(), 250);
+}
+
+// Watchdog: if analytics never initializes (blocked script, JS error, hung fetch),
+// replace the skeleton with a recoverable error state instead of hanging forever.
+setTimeout(() => {
+  const el = document.getElementById('analyticsCharts');
+  if (el && el.querySelector('.analytics-skeleton')) {
+    el.innerHTML =
+      '<div class="analytics-error">' +
+        '<div class="err-icon">&#9888;</div>' +
+        '<p>Analytics charts failed to initialize. Check your connection and retry.</p>' +
+        '<button type="button" class="btn btn-secondary" onclick="window.retryAnalytics && window.retryAnalytics()">Retry</button>' +
+      '</div>';
+  }
+}, 6000);
 </script>
   <script src="../js/notifications.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="../js/analytics.js"></script>
+  <script src="../js/vendor/chart.umd.min.js"></script>
+  <script src="../js/analytics.js?v=4"></script>
 </body>
 </html>

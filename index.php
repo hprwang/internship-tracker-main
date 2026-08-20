@@ -76,10 +76,108 @@ $csrf = generateCSRF();
     /* Main Container - Split Screen */
     .login-container {
       min-height: 100vh;
-      display: flex;
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
       width: 100%;
       position: relative;
+    }
+
+    /* Brand Panel */
+    .brand-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      position: relative;
       overflow: hidden;
+      background:
+        radial-gradient(ellipse 70% 55% at 25% 15%, rgba(34, 197, 94, 0.12), transparent 60%),
+        radial-gradient(ellipse 55% 45% at 85% 90%, rgba(22, 163, 74, 0.10), transparent 60%),
+        var(--black);
+    }
+
+    .brand-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(34, 197, 94, 0.10) 1px, transparent 1px);
+      background-size: 26px 26px;
+      -webkit-mask-image: radial-gradient(ellipse 60% 70% at 30% 40%, #000 0%, transparent 78%);
+      mask-image: radial-gradient(ellipse 60% 70% at 30% 40%, #000 0%, transparent 78%);
+      pointer-events: none;
+    }
+
+    .brand-content {
+      position: relative;
+      z-index: 1;
+      max-width: 480px;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .brand-logo-icon {
+      width: 46px;
+      height: 46px;
+      background: linear-gradient(135deg, #22C55E, #16A34A);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      color: #fff;
+      box-shadow: 0 0 25px rgba(34, 197, 94, 0.35);
+    }
+
+    .brand-logo-text {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-logo-text span {
+      color: var(--primary-green);
+    }
+
+    .brand-title {
+      font-size: 2.4rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+
+    .brand-title span {
+      color: var(--primary-green);
+    }
+
+    .brand-subtitle {
+      color: #A8ABB1;
+      font-size: 1.05rem;
+      margin-bottom: 2.5rem;
+      max-width: 420px;
+    }
+
+    .brand-stats {
+      display: flex;
+      gap: 2.5rem;
+    }
+
+    .brand-stat strong {
+      display: block;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .brand-stat span {
+      color: var(--muted);
+      font-size: 0.85rem;
     }
 
     /* Background Effects */
@@ -136,10 +234,10 @@ $csrf = generateCSRF();
       background: rgba(17, 17, 17, 0.8);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--border);
+      border: 1px solid rgba(34, 197, 94, 0.18);
       border-radius: 12px;
       padding: 2.5rem;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 197, 94, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(34, 197, 94, 0.06);
     }
 
     .login-card-header {
@@ -186,8 +284,9 @@ $csrf = generateCSRF();
     }
 
     .auth-tab:not(.active):hover {
-      background: rgba(34, 197, 94, 0.1);
+      background: rgba(34, 197, 94, 0.12);
       color: var(--primary-green);
+      transform: translateY(-1px);
     }
 
     /* Form Styles */
@@ -198,8 +297,8 @@ $csrf = generateCSRF();
     .form-label {
       display: block;
       font-size: 0.8rem;
-      font-weight: 500;
-      color: var(--muted);
+      font-weight: 600;
+      color: #C3C7CE;
       margin-bottom: 0.5rem;
     }
 
@@ -218,11 +317,37 @@ $csrf = generateCSRF();
 
     .form-control:focus {
       border-color: var(--primary-green);
-      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
     }
 
+    .form-control.invalid {
+      border-color: #EF4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+    }
+
+    .form-control.valid {
+      border-color: var(--primary-green);
+    }
+
+    .field-feedback {
+      display: block;
+      font-size: 0.75rem;
+      margin-top: 0.35rem;
+      min-height: 1em;
+    }
+
+    .field-feedback.error { color: #F87171; }
+    .field-feedback.success { color: var(--primary-green); }
+
     .form-control::placeholder {
-      color: var(--muted);
+      color: #6B7280;
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--primary-green);
+      outline-offset: 2px;
     }
 
     /* Password Wrapper */
@@ -243,9 +368,9 @@ $csrf = generateCSRF();
       background: none;
       border: none;
       cursor: pointer;
-      font-size: 1rem;
+      font-size: 1.05rem;
       padding: 0.25rem;
-      color: var(--muted);
+      color: #C3C7CE;
       transition: all 0.2s ease;
       display: flex;
       align-items: center;
@@ -254,6 +379,7 @@ $csrf = generateCSRF();
 
     .password-toggle:hover {
       color: var(--primary-green);
+      transform: scale(1.1);
     }
 
     /* Buttons */
@@ -279,6 +405,50 @@ $csrf = generateCSRF();
       box-shadow: 0 10px 30px rgba(34, 197, 94, 0.3);
     }
 
+    .btn-signin:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-signin .btn-spinner {
+      display: none;
+      margin-right: 0.5rem;
+    }
+
+    /* Remember me / forgot row */
+    .form-row-between {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0.25rem 0 1rem;
+    }
+
+    .remember-label {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: #C3C7CE;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .remember-label input[type="checkbox"] {
+      accent-color: var(--primary-green);
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .role-note {
+      margin-top: 1.25rem;
+      font-size: 0.78rem;
+      color: #8A9099;
+      text-align: center;
+      line-height: 1.5;
+    }
+
     .btn-secondary {
       width: 100%;
       padding: 0.875rem 1.25rem;
@@ -300,13 +470,12 @@ $csrf = generateCSRF();
 
     /* Forgot Link */
     .forgot-link {
-      display: block;
-      text-align: center;
+      display: inline-block;
       color: var(--primary-green);
       font-size: 0.85rem;
       font-weight: 500;
       text-decoration: none;
-      margin-top: 1rem;
+      margin-top: 0;
       transition: all 0.2s ease;
     }
 
@@ -367,7 +536,11 @@ $csrf = generateCSRF();
     /* Responsive */
     @media (max-width: 968px) {
       .login-container {
-        flex-direction: column;
+        grid-template-columns: 1fr;
+      }
+
+      .brand-panel {
+        display: none;
       }
 
       .main-panel {
@@ -506,14 +679,25 @@ $csrf = generateCSRF();
   <div id="toast-container" class="toast-container"></div>
   <div class="bg-effects"></div>
 
-  <!-- Logo in top left -->
-  <a href="landing.php" style="position:fixed;top:1.5rem;left:1.5rem;text-decoration:none;z-index:100;display:flex;align-items:center;gap:0.5rem;">
-    <div style="width:42px;height:42px;background:linear-gradient(135deg,#00ff66,#00cc52);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;box-shadow:0 0 25px rgba(0,255,102,0.4);color:#fff;"><i class="fas fa-clipboard-list"></i></div>
-    <div style="font-size:1.35rem;font-weight:800;color:var(--white);letter-spacing:-0.02em;">Intern<span style="color:#00ff66;">Track</span></div>
-  </a>
+  <div class="login-container">
+    <!-- Brand Panel -->
+    <div class="brand-panel">
+      <div class="brand-content">
+        <div class="brand-logo">
+          <div class="brand-logo-icon"><i class="fas fa-clipboard-list"></i></div>
+          <div class="brand-logo-text">Intern<span>Track</span></div>
+        </div>
+        <h1 class="brand-title">Track every step of <span>your internship.</span></h1>
+        <p class="brand-subtitle">Students log progress, hit milestones, and stay on top of deadlines. Admins monitor everything — all in one secure workspace.</p>
+        <div class="brand-stats">
+          <div class="brand-stat"><strong>Real-time</strong><span>dashboards</span></div>
+          <div class="brand-stat"><strong>All roles</strong><span>one platform</span></div>
+          <div class="brand-stat"><strong>Secure</strong><span>by design</span></div>
+        </div>
+      </div>
+    </div>
 
-  <div class="login-container" style="display:block;">
-    <!-- Main Panel -->
+    <!-- Form Panel -->
     <div class="main-panel">
       <div class="login-card">
         <div class="login-card-header">
@@ -538,14 +722,24 @@ $csrf = generateCSRF();
               <label class="form-label">Password</label>
               <div class="password-wrapper">
                 <input type="password" name="password" class="form-control password-input" placeholder="Enter your password" required>
-                <button type="button" class="password-toggle" onclick="var w=this.parentElement, i=w.querySelector('input'); i.type=i.type==='password'?'text':'password'; this.innerHTML=i.type==='password'?'<i class=\'fas fa-eye\'></i>':'<i class=\'fas fa-eye-slash\'></i>'" aria-label="Toggle password visibility" tabindex="0"><i class="fas fa-eye"></i></button>
+                <button type="button" class="password-toggle" onclick="togglePasswordVisibility(this)" aria-label="Show password" aria-pressed="false" tabindex="0"><i class="fas fa-eye"></i></button>
               </div>
             </div>
 
-            <button type="submit" id="login-btn" class="btn-signin">Sign In</button>
+            <div class="form-row-between">
+              <label class="remember-label">
+                <input type="checkbox" name="remember_me" id="remember-me">
+                <span>Remember me</span>
+              </label>
+              <a href="#" onclick="openForgotPasswordModal(); return false;" class="forgot-link">Forgot Password?</a>
+            </div>
 
-            
-            <a href="#" onclick="openForgotPasswordModal(); return false;" class="forgot-link">Forgot Password?</a>
+            <button type="submit" id="login-btn" class="btn-signin">
+              <span class="btn-spinner" aria-hidden="true"><i class="fas fa-spinner fa-spin"></i></span>
+              <span class="btn-label">Log In</span>
+            </button>
+
+            <p class="role-note">You'll be redirected based on your role — students to the dashboard, admins to the admin console.</p>
           </form>
         </div>
 
@@ -585,5 +779,55 @@ $csrf = generateCSRF();
 
   <script src="js/app.js"></script>
   <script src="js/interactive.js"></script>
+  <script>
+    function togglePasswordVisibility(btn) {
+      const input = btn.parentElement.querySelector('input');
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.innerHTML = show ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      btn.setAttribute('aria-pressed', String(show));
+    }
+
+    // Real-time inline validation for the login form
+    function validateLoginField(field) {
+      const group = field.closest('.form-group');
+      const feedback = group.querySelector('.field-feedback');
+      const val = field.value.trim();
+      let ok = true;
+      let msg = '';
+      if (field.name === 'username') {
+        ok = val.length >= 3;
+        msg = ok ? 'Looks good' : 'Username must be at least 3 characters';
+      } else if (field.name === 'password') {
+        ok = val.length >= 6;
+        msg = ok ? 'Looks good' : 'Password must be at least 6 characters';
+      }
+      field.classList.toggle('valid', ok);
+      field.classList.toggle('invalid', !ok);
+      feedback.className = 'field-feedback ' + (ok ? 'success' : 'error');
+      feedback.textContent = msg;
+    }
+
+    document.querySelectorAll('#login-form .form-control').forEach(field => {
+      const group = field.closest('.form-group');
+      const feedback = document.createElement('span');
+      feedback.className = 'field-feedback';
+      group.appendChild(feedback);
+      field.addEventListener('blur', () => {
+        if (field.value.trim()) validateLoginField(field);
+      });
+      field.addEventListener('input', () => {
+        if (!field.value.trim()) {
+          field.classList.remove('valid', 'invalid');
+          feedback.textContent = '';
+          feedback.className = 'field-feedback';
+        } else {
+          validateLoginField(field);
+        }
+      });
+    });
+  </script>
 </body>
 </html>

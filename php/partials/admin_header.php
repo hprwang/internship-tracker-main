@@ -50,7 +50,7 @@ function renderAdminSidebar(array $user, string $activePage): void {
       <div class="user-chip">
         <div class="user-avatar"><?= e($initial) ?></div>
         <div class="user-info">
-          <div class="user-name"><?= e($name) ?></div>
+          <div class="user-name" title="<?= e($name) ?>"><?= e($name) ?></div>
           <div class="user-role">Administrator</div>
         </div>
       </div>

@@ -50,6 +50,27 @@ CREATE TABLE IF NOT EXISTS users (
   company_id INT DEFAULT NULL,
   is_active TINYINT(1) DEFAULT 1,
   email_verified TINYINT(1) DEFAULT 1,
+  -- Extended profile fields (added at runtime by ensureProfileFields())
+  university VARCHAR(200) DEFAULT NULL,
+  faculty VARCHAR(200) DEFAULT NULL,
+  major VARCHAR(200) DEFAULT NULL,
+  gpa VARCHAR(40) DEFAULT NULL,
+  graduation_date VARCHAR(100) DEFAULT NULL,
+  coursework TEXT,
+  career_field VARCHAR(200) DEFAULT NULL,
+  portfolio VARCHAR(255) DEFAULT NULL,
+  linkedin VARCHAR(255) DEFAULT NULL,
+  github VARCHAR(255) DEFAULT NULL,
+  languages VARCHAR(255) DEFAULT NULL,
+  location VARCHAR(150) DEFAULT NULL,
+  skills TEXT,
+  internship_type VARCHAR(100) DEFAULT NULL,
+  expected_stipend VARCHAR(50) DEFAULT NULL,
+  industries VARCHAR(255) DEFAULT NULL,
+  availability_date VARCHAR(100) DEFAULT NULL,
+  pref_locations VARCHAR(255) DEFAULT NULL,
+  notification_prefs TEXT,
+  twofa_enabled TINYINT(1) DEFAULT 0,
   last_login TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -223,6 +244,19 @@ CREATE TABLE IF NOT EXISTS notifications (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_user (user_id),
   INDEX idx_read (is_read)
+) ENGINE=InnoDB;
+
+-- Profile documents: resumes/attachments uploaded by students (profile page)
+CREATE TABLE IF NOT EXISTS profile_documents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  student_id INT NOT NULL,
+  kind VARCHAR(30) DEFAULT 'resume',
+  filename VARCHAR(255) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  file_size INT,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_student (student_id)
 ) ENGINE=InnoDB;
 
 -- Achievements: awards/recognitions on student profiles

@@ -174,6 +174,55 @@ function ensureEmailVerification(): void {
 }
 
 /**
+ * Profile fields — ensures the extended users columns and the
+ * profile_documents table exist. Called by the profile page on load.
+ */
+function ensureProfileFields(): void {
+    try {
+        $db = Database::getConnection();
+        $db->exec("CREATE TABLE IF NOT EXISTS profile_documents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            student_id INT NOT NULL,
+            kind VARCHAR(30) DEFAULT 'resume',
+            filename VARCHAR(255) NOT NULL,
+            original_name VARCHAR(255) NOT NULL,
+            file_size INT,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_student (student_id)
+        ) ENGINE=InnoDB");
+
+        $cols = [
+            'university'        => 'VARCHAR(200)',
+            'faculty'           => 'VARCHAR(200)',
+            'major'             => 'VARCHAR(200)',
+            'gpa'               => 'VARCHAR(40)',
+            'graduation_date'   => 'VARCHAR(100)',
+            'coursework'        => 'TEXT',
+            'career_field'      => 'VARCHAR(200)',
+            'portfolio'         => 'VARCHAR(255)',
+            'linkedin'          => 'VARCHAR(255)',
+            'github'            => 'VARCHAR(255)',
+            'languages'         => 'VARCHAR(255)',
+            'location'          => 'VARCHAR(150)',
+            'skills'            => 'TEXT',
+            'internship_type'   => 'VARCHAR(100)',
+            'expected_stipend'  => 'VARCHAR(50)',
+            'industries'        => 'VARCHAR(255)',
+            'availability_date' => 'VARCHAR(100)',
+            'pref_locations'    => 'VARCHAR(255)',
+            'notification_prefs'=> 'TEXT',
+            'twofa_enabled'     => 'TINYINT(1) DEFAULT 0',
+        ];
+        foreach ($cols as $name => $type) {
+            $db->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS `$name` $type");
+        }
+    } catch (Exception $e) {
+        error_log("ensureProfileFields: " . $e->getMessage());
+    }
+}
+
+/**
  * Rate limiting — stored in the login_rate_limits DB table (no temp files, no JSON).
  * The table is created automatically on first use.
  */

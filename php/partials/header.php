@@ -25,6 +25,7 @@ function renderNotifBell(array $user): string {
       .notif-bell { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: var(--bg-card, #161616); border: 1px solid var(--border-subtle, #222222); color: var(--text-secondary, #A1A1AA); cursor: pointer; flex-shrink: 0; }
       .notif-bell:hover { color: var(--green-neon, #22C55E); border-color: rgba(34,197,94,0.4); }
       .notif-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #EF4444; color: #fff; font-size: 0.68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+      .notif-badge[hidden] { display: none; }
       .notif-dropdown { position: absolute; right: 0; top: calc(100% + 8px); width: 320px; max-height: 380px; overflow-y: auto; background: var(--bg-card, #161616); border: 1px solid var(--border-subtle, #222222); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.5); z-index: 100; }
       .notif-item { display: flex; gap: 0.6rem; padding: 0.75rem; border-bottom: 1px solid var(--border-subtle, #222222); cursor: pointer; }
       .notif-item:last-child { border-bottom: none; }
