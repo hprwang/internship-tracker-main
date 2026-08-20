@@ -798,6 +798,40 @@ $dashboardData = json_encode([
         grid-template-columns: 1fr 1fr;
       }
     }
+
+    /* Theme-consistent primary buttons (override global blue) */
+    .btn-primary {
+      background: linear-gradient(135deg, var(--green-emerald), var(--green-neon));
+      color: var(--bg-deep);
+      font-weight: 700;
+      border: none;
+      box-shadow: none;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--green-emerald), var(--green-neon));
+      color: var(--bg-deep);
+      box-shadow: 0 0 25px rgba(34,197,94,0.5);
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: var(--bg-panel);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+    }
+    .btn-secondary:hover {
+      border-color: var(--green-neon);
+      color: var(--green-neon);
+    }
+    .btn-danger {
+      background: rgba(239,68,68,0.08);
+      color: #F87171;
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .btn-danger:hover {
+      background: rgba(239,68,68,0.15);
+      border-color: #F87171;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
