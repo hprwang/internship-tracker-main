@@ -204,10 +204,9 @@ function handleForgotRequest(): void {
         try {
             $tokenPlain = bin2hex(random_bytes(32));
             $tokenHash  = password_hash($tokenPlain, PASSWORD_BCRYPT, ['cost' => 10]);
-            $expiresAt  = (new DateTime('+1 hour'))->format('Y-m-d H:i:s');
 
-            $ins = $db->prepare("INSERT INTO password_resets (user_id, email, token_hash, expires_at) VALUES (?,?,?,?)");
-            $ins->execute([(int)$user['id'], $email, $tokenHash, $expiresAt]);
+            $ins = $db->prepare("INSERT INTO password_resets (user_id, email, token_hash, expires_at) VALUES (?,?,?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 HOUR))");
+            $ins->execute([(int)$user['id'], $email, $tokenHash]);
 
             // Build reset URL dynamically so it works regardless of whether the app is served
             // from http://localhost/ or http://localhost/internship-tracker/
@@ -329,7 +328,7 @@ function handleForgotReset(): void {
         FROM password_resets pr
         WHERE pr.email = ?
           AND pr.used_at IS NULL
-          AND pr.expires_at > NOW()
+          AND pr.expires_at > UTC_TIMESTAMP()
         ORDER BY pr.created_at DESC
         LIMIT 5
     ");

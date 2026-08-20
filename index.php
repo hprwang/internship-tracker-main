@@ -384,6 +384,64 @@ $csrf = generateCSRF();
         flex-direction: column;
       }
     }
+
+    /* Forgot Password Modal */
+    #forgot-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    #forgot-modal.open { display: flex; }
+    #forgot-modal .modal {
+      width: 100%;
+      max-width: 420px;
+      background: var(--dark-gray);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #forgot-modal .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    #forgot-modal .modal-header strong {
+      font-size: 1.05rem;
+      color: var(--white);
+      font-weight: 700;
+    }
+    #forgot-modal .modal-close {
+      width: 32px;
+      height: 32px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      font-size: 1.25rem;
+      cursor: pointer;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    #forgot-modal .modal-close:hover {
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #F87171;
+      background: rgba(239, 68, 68, 0.08);
+    }
+    #forgot-modal .modal-body { padding: 1.5rem; }
   /* Toast Container */
     .toast-container {
       position: fixed;
@@ -489,33 +547,6 @@ $csrf = generateCSRF();
             
             <a href="#" onclick="openForgotPasswordModal(); return false;" class="forgot-link">Forgot Password?</a>
           </form>
-
-          <!-- Forgot Password Modal -->
-          <div id="forgot-modal" class="modal-overlay" style="display:none">
-            <div class="modal">
-              <div class="modal-header">
-                <strong>Reset Password</strong>
-                <button type="button" class="modal-close" onclick="closeForgotPasswordModal()" aria-label="Close">×</button>
-              </div>
-
-              <div class="modal-body">
-                <form onsubmit="handleForgotRequest(event)">
-                  <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" placeholder="email@example.com" required>
-                  </div>
-
-                  <button type="submit" class="btn-signin" id="forgot-btn">
-                    Send Reset Link
-                  </button>
-
-                  <p style="margin-top:.8rem;font-size:.82rem;color:var(--muted)">
-                    If your email exists, we'll send a password reset link.
-                  </p>
-                </form>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div class="login-footer">
@@ -525,6 +556,32 @@ $csrf = generateCSRF();
     </div>
   </div>
 
+  <!-- Forgot Password Modal (direct child of body so the fixed overlay covers the whole viewport) -->
+  <div id="forgot-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <strong>Reset Password</strong>
+        <button type="button" class="modal-close" onclick="closeForgotPasswordModal()" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <form onsubmit="handleForgotRequest(event)">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" placeholder="email@example.com" required>
+          </div>
+
+          <button type="submit" class="btn-signin" id="forgot-btn">
+            Send Reset Link
+          </button>
+
+          <p style="margin-top:.8rem;font-size:.82rem;color:var(--muted)">
+            If your email exists, we'll send a password reset link.
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <script src="js/app.js"></script>
   <script src="js/interactive.js"></script>

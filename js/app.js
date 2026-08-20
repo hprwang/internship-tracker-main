@@ -665,11 +665,11 @@ function checkPasswordMatch() {
 /* ── Forgot Password UI ──────────────────────────────── */
 function openForgotPasswordModal() {
   const el = document.getElementById('forgot-modal');
-  if (el) { el.style.display = 'block'; el.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  if (el) { el.classList.add('open'); document.body.style.overflow = 'hidden'; }
 }
 function closeForgotPasswordModal() {
   const el = document.getElementById('forgot-modal');
-  if (el) { el.style.display = 'none'; el.classList.remove('open'); document.body.style.overflow = ''; }
+  if (el) { el.classList.remove('open'); document.body.style.overflow = ''; }
 }
 
 async function handleForgotRequest(e) {

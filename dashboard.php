@@ -1178,22 +1178,90 @@ $dashboardData = json_encode([
   </div>
 
   <style>
-    /* Scoped dark-theme fallbacks for the shared modal/form classes on this page */
-    #intern-modal .modal-header { background: var(--bg-panel, #111111); }
-    #intern-modal .modal-title { color: var(--text-primary, #ffffff); }
-    #intern-modal .form-label { color: var(--text-muted, #71717a); }
+    /* Scoped neon-green theme for the internship add/edit modal */
+    #intern-modal {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      opacity: 1;
+      pointer-events: none;
+      transition: none;
+    }
+    #intern-modal.open {
+      display: flex;
+      opacity: 1;
+      pointer-events: all;
+    }
+    #intern-modal .modal {
+      background: var(--bg-card, #161616);
+      border: 1px solid var(--border-subtle, #222222);
+      border-radius: var(--radius-lg, 16px);
+      box-shadow: var(--shadow-soft, 0 4px 24px rgba(0,0,0,0.4));
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    #intern-modal .modal-header {
+      background: var(--bg-panel, #111111);
+      border-bottom: 1px solid var(--border-subtle, #222222);
+      padding: 1.25rem 1.5rem;
+    }
+    #intern-modal .modal-title {
+      color: var(--text-primary, #ffffff);
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    #intern-modal .modal-title::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--green-emerald), var(--green-neon));
+      box-shadow: 0 0 12px rgba(34,197,94,.5);
+    }
+    #intern-modal .modal-close {
+      background: var(--bg-elevated, #1a1a1a);
+      color: var(--text-muted, #71717a);
+      border: 1px solid var(--border-subtle, #222222);
+    }
+    #intern-modal .modal-close:hover {
+      background: rgba(239,68,68,.15);
+      border-color: rgba(239,68,68,.4);
+      color: #F87171;
+    }
+    #intern-modal .modal-body {
+      background: var(--bg-card, #161616);
+      padding: 1.5rem;
+    }
+    #intern-modal .form-label {
+      color: var(--text-secondary, #a1a1aa);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
     #intern-modal .form-control {
       background: var(--bg-panel, #111111);
       border: 1px solid var(--border-subtle, #222222);
-      border-radius: var(--radius-sm, 8px);
+      border-radius: var(--radius-md, 12px);
       color: var(--text-primary, #ffffff);
+      padding: 0.7rem 0.9rem;
+      font-size: 0.9rem;
     }
     #intern-modal .form-control:focus {
-      border-color: var(--green-neon, #22C55E);
+      outline: none;
+      border-color: var(--green-neon, #22c55e);
       box-shadow: 0 0 0 3px rgba(34,197,94,.12);
     }
     #intern-modal select.form-control option { background: var(--bg-panel, #111111); color: var(--text-primary, #ffffff); }
     #intern-modal input[type="file"].form-control { padding: .5rem 1rem; }
+    #intern-modal .modal-footer {
+      background: var(--bg-panel, #111111);
+      border-top: 1px solid var(--border-subtle, #222222);
+      padding: 1.25rem 1.5rem;
+    }
   </style>
 
   <script src="js/interactive.js"></script>

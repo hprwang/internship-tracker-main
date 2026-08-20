@@ -10,6 +10,22 @@ if (file_exists($composerAutoload)) {
     require_once $composerAutoload;
 }
 
+// Load .env file if present (secrets stay out of the repo)
+$envFile = dirname(__DIR__) . '/.env';
+if (is_file($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') continue;
+        $pos = strpos($line, '=');
+        if ($pos === false) continue;
+        $key = trim(substr($line, 0, $pos));
+        $val = trim(substr($line, $pos + 1));
+        if ($key !== '' && getenv($key) === false) {
+            putenv($key . '=' . $val);
+        }
+    }
+}
+
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'internship_tracker1');
 define('DB_USER', getenv('DB_USER') ?: 'root');
@@ -28,7 +44,7 @@ define('ALLOWED_TYPES', ['application/pdf', 'image/jpeg', 'image/png', 'applicat
 // Set USE_SMTP = false to fall back to PHP's built-in mail() (XAMPP local only).
 define('USE_SMTP',       true);  // SMTP enabled for Gmail
 define('SMTP_HOST',      'smtp.gmail.com');     // e.g. smtp.gmail.com | smtp.office365.com
-define('SMTP_PORT',      587);                  // 587 = STARTTLS  |  465 = SSL
+define('SMTP_PORT',      465);                  // 465 = implicit TLS (STARTTLS on 587 fails on ZTS Windows PHP)
 define('SMTP_SECURE',    'tls');                // 'tls' (port 587) or 'ssl' (port 465)
 define('SMTP_USERNAME',  getenv('SMTP_USERNAME') ?: '');      // Ã¢â€ Â set via env, e.g. your Gmail address
 define('SMTP_PASSWORD',  getenv('SMTP_PASSWORD') ?: '');      // Ã¢â€ Â set via env (Gmail App Password, not your login pw)
@@ -115,7 +131,27 @@ function logActivity(int $userId, string $action, string $entityType = '', int $
 }
 
 /**
- * Rate limiting Ã¢â‚¬â€ stored in the login_rate_limits DB table (no temp files, no JSON).
+ * Ensure the achievements table exists (auto-created on first use,
+ * mirroring the login_rate_limits pattern).
+ */
+function ensureAchievementsTable(): void {
+    try {
+        Database::getConnection()->exec("CREATE TABLE IF NOT EXISTS achievements (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            student_id INT NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            achievement_date VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_student (student_id)
+        ) ENGINE=InnoDB");
+    } catch (Exception $e) {
+        error_log("Achievements table error: " . $e->getMessage());
+    }
+}
+
+/**
+ * Rate limiting — stored in the login_rate_limits DB table (no temp files, no JSON).
  * The table is created automatically on first use.
  */
 function checkRateLimit(string $key, int $maxAttempts = 5, int $windowSeconds = 60): bool {
@@ -166,6 +202,21 @@ function checkRateLimit(string $key, int $maxAttempts = 5, int $windowSeconds = 
 }
 
 /**
+ * Read a full SMTP response, including multi-line (250-/250 continuation)
+ * replies. Leaving bytes unread in the socket buffer breaks
+ * stream_socket_enable_crypto(), so this is required before STARTTLS.
+ */
+function smtpReadResponse($socket): string {
+    $response = '';
+    do {
+        $line = fgets($socket, 1024);
+        if ($line === false) break;
+        $response .= $line;
+    } while (isset($line[3]) && $line[3] === '-');
+    return $response;
+}
+
+/**
  * Send email via native PHP SMTP (no PHPMailer required)
  */
 function sendMailViaSMTP(string $to, string $toName, string $subject, string $bodyHtml, string $bodyText): bool {
@@ -177,51 +228,46 @@ function sendMailViaSMTP(string $to, string $toName, string $subject, string $bo
         $from = SMTP_FROM_EMAIL;
         $fromName = SMTP_FROM_NAME;
 
-        // Connect to SMTP server
-        $socket = @fsockopen($host, $port, $errno, $errstr, 30);
+        if ($username === '' || $password === '') {
+            error_log("SMTP skipped: credentials not configured");
+            return false;
+        }
+
+        // Connect over implicit TLS (port 465). STARTTLS is avoided because
+        // stream_socket_enable_crypto() is broken on ZTS Windows PHP builds.
+        $ctx = stream_context_create(['ssl' => [
+            'verify_peer'       => true,
+            'verify_peer_name'  => true,
+            'allow_self_signed' => false,
+            'peer_name'         => $host,
+        ]]);
+        $socket = @stream_socket_client("tls://{$host}:{$port}", $errno, $errstr, 30, STREAM_CLIENT_CONNECT, $ctx);
         if (!$socket) {
             error_log("SMTP Connection failed: $errstr ($errno)");
             return false;
         }
 
-        $response = fgets($socket, 1024);
+        $response = smtpReadResponse($socket);
         if (strpos($response, '220') === false) {
+            error_log("SMTP greeting failed: $response");
             fclose($socket);
             return false;
         }
 
         // Send EHLO
         fwrite($socket, "EHLO " . gethostname() . "\r\n");
-        $response = fgets($socket, 1024);
-
-        // Start TLS
-        fwrite($socket, "STARTTLS\r\n");
-        $response = fgets($socket, 1024);
-        
-        if (!stream_context_set_default(['ssl' => ['allow_self_signed' => true, 'verify_peer' => false, 'verify_peer_name' => false]])) {
-            error_log("Failed to set SSL context");
-        }
-        
-        if (!@stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT)) {
-            error_log("TLS negotiation failed");
-            fclose($socket);
-            return false;
-        }
-
-        // Send EHLO again after TLS
-        fwrite($socket, "EHLO " . gethostname() . "\r\n");
-        $response = fgets($socket, 1024);
+        $response = smtpReadResponse($socket);
 
         // Authenticate
         fwrite($socket, "AUTH LOGIN\r\n");
-        $response = fgets($socket, 1024);
-        
+        $response = smtpReadResponse($socket);
+
         fwrite($socket, base64_encode($username) . "\r\n");
-        $response = fgets($socket, 1024);
-        
+        $response = smtpReadResponse($socket);
+
         fwrite($socket, base64_encode($password) . "\r\n");
-        $response = fgets($socket, 1024);
-        
+        $response = smtpReadResponse($socket);
+
         if (strpos($response, '235') === false && strpos($response, '250') === false) {
             error_log("SMTP Authentication failed: $response");
             fclose($socket);
@@ -230,13 +276,13 @@ function sendMailViaSMTP(string $to, string $toName, string $subject, string $bo
 
         // Send email
         fwrite($socket, "MAIL FROM: <" . $from . ">\r\n");
-        $response = fgets($socket, 1024);
+        $response = smtpReadResponse($socket);
 
         fwrite($socket, "RCPT TO: <" . $to . ">\r\n");
-        $response = fgets($socket, 1024);
+        $response = smtpReadResponse($socket);
 
         fwrite($socket, "DATA\r\n");
-        $response = fgets($socket, 1024);
+        $response = smtpReadResponse($socket);
 
         $headers = "From: " . $fromName . " <" . $from . ">\r\n";
         $headers .= "To: " . $toName . " <" . $to . ">\r\n";
@@ -249,7 +295,7 @@ function sendMailViaSMTP(string $to, string $toName, string $subject, string $bo
 
         $message = $headers . $bodyHtml;
         fwrite($socket, $message . "\r\n.\r\n");
-        $response = fgets($socket, 1024);
+        $response = smtpReadResponse($socket);
 
         if (strpos($response, '250') === false) {
             error_log("Email send failed: $response");

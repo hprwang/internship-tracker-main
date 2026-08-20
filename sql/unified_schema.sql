@@ -212,6 +212,17 @@ CREATE TABLE IF NOT EXISTS notifications (
   INDEX idx_read (is_read)
 ) ENGINE=InnoDB;
 
+-- Achievements: awards/recognitions on student profiles
+CREATE TABLE IF NOT EXISTS achievements (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  student_id INT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  achievement_date VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_student (student_id)
+) ENGINE=InnoDB;
+
 -- ============================================
 -- Seed data (fresh installs only)
 -- ============================================

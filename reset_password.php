@@ -18,7 +18,7 @@ if (!empty($token) && !empty($email)) {
             FROM password_resets pr
             WHERE pr.email = ?
               AND pr.used_at IS NULL
-              AND pr.expires_at > NOW()
+              AND pr.expires_at > UTC_TIMESTAMP()
             ORDER BY pr.created_at DESC
             LIMIT 5
         ");
@@ -74,6 +74,17 @@ if (!empty($token) && !empty($email)) {
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-deep); color: var(--text-primary); min-height: 100vh; line-height: 1.55; display: flex; align-items: center; justify-content: center; }
+
+    .auth-wrap {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 420px;
+      margin: 2rem 1rem;
+    }
 
     /* Background Effects */
     .bg-effects { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
@@ -194,6 +205,76 @@ if (!empty($token) && !empty($email)) {
       color: var(--text-muted);
     }
 
+    /* Password wrapper with toggle */
+    .password-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .password-input {
+      padding-right: 3rem;
+      width: 100%;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 0.75rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.25rem;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .password-toggle:hover {
+      color: var(--green-neon);
+    }
+
+    /* Password strength */
+    .password-strength {
+      margin-top: 0.5rem;
+      display: none;
+    }
+
+    .password-strength.visible {
+      display: block;
+    }
+
+    .strength-bars {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 0.375rem;
+    }
+
+    .strength-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--border-subtle);
+      border-radius: 2px;
+      transition: background 0.3s ease;
+    }
+
+    .strength-bar.weak { background: #EF4444; }
+    .strength-bar.medium { background: #F59E0B; }
+    .strength-bar.strong { background: #22C55E; }
+
+    .strength-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .strength-label.weak { color: #EF4444; }
+    .strength-label.medium { color: #F59E0B; }
+    .strength-label.strong { color: #22C55E; }
+
     /* Button */
     .btn-primary {
       width: 100%;
@@ -291,6 +372,43 @@ if (!empty($token) && !empty($email)) {
     .back-link a:hover {
       text-decoration: underline;
     }
+
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      top: 1.5rem;
+      right: 1.5rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .toast {
+      padding: 1rem 1.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+      animation: slideIn .3s ease;
+      min-width: 250px;
+    }
+
+    .toast.success { border-color: var(--green-neon); }
+    .toast.success .toast-icon { color: var(--green-neon); }
+    .toast.error { border-color: #EF4444; }
+    .toast.error .toast-icon { color: #EF4444; }
+
+    .toast-icon { font-weight: 700; font-size: 1rem; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
   </style>
 </head>
 <body>
@@ -298,6 +416,7 @@ if (!empty($token) && !empty($email)) {
   <div class="bg-effects"></div>
   <div id="toast-container" class="toast-container"></div>
 
+  <div class="auth-wrap">
   <div class="auth-card">
     <div class="auth-logo">
       <div class="logo-icon"><i class="fas fa-clipboard-list"></i></div>
@@ -326,12 +445,30 @@ if (!empty($token) && !empty($email)) {
 
           <div class="form-group">
             <label class="form-label">New Password</label>
-            <input type="password" name="new_password" class="form-control" placeholder="Min. 8 chars, 1 uppercase, 1 number" required>
+            <div class="password-wrapper">
+              <input type="password" name="new_password" id="new-password" class="form-control password-input" placeholder="Min. 8 chars, 1 uppercase, 1 number" required autocomplete="new-password" oninput="checkPasswordStrength(this)">
+              <button type="button" class="password-toggle" onclick="var i=this.parentElement.querySelector('input'); i.type=i.type==='password'?'text':'password'; this.innerHTML=i.type==='password'?'<i class=\'fas fa-eye\'></i>':'<i class=\'fas fa-eye-slash\'></i>'" aria-label="Toggle password visibility" tabindex="0"><i class="fas fa-eye"></i></button>
+            </div>
+            <div class="password-strength" id="password-strength">
+              <div class="strength-bars">
+                <div class="strength-bar" id="bar1"></div>
+                <div class="strength-bar" id="bar2"></div>
+                <div class="strength-bar" id="bar3"></div>
+                <div class="strength-bar" id="bar4"></div>
+              </div>
+              <div class="strength-label">
+                <span id="strength-text">Password strength</span>
+                <span id="strength-hint"></span>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">Confirm Password</label>
-            <input type="password" name="confirm_password" class="form-control" placeholder="Confirm new password" required>
+            <div class="password-wrapper">
+              <input type="password" name="confirm_password" class="form-control password-input" placeholder="Confirm new password" required autocomplete="new-password">
+              <button type="button" class="password-toggle" onclick="var i=this.parentElement.querySelector('input'); i.type=i.type==='password'?'text':'password'; this.innerHTML=i.type==='password'?'<i class=\'fas fa-eye\'></i>':'<i class=\'fas fa-eye-slash\'></i>'" aria-label="Toggle password visibility" tabindex="0"><i class="fas fa-eye"></i></button>
+            </div>
           </div>
 
           <button type="submit" id="reset-btn" class="btn-primary">Update Password</button>
@@ -343,35 +480,91 @@ if (!empty($token) && !empty($email)) {
       <a href="index.php">← Back to Sign In</a>
     </div>
   </div>
+  </div>
 
   <script src="js/app.js"></script>
   <script src="js/interactive.js"></script>
   <script>
+    function checkPasswordStrength(input) {
+      const password = input.value;
+      const strengthEl = document.getElementById('password-strength');
+      const bar1 = document.getElementById('bar1');
+      const bar2 = document.getElementById('bar2');
+      const bar3 = document.getElementById('bar3');
+      const bar4 = document.getElementById('bar4');
+      const textEl = document.getElementById('strength-text');
+      const labelEl = textEl.parentElement;
+
+      if (!password) {
+        strengthEl.classList.remove('visible');
+        return;
+      }
+      strengthEl.classList.add('visible');
+
+      bar1.className = 'strength-bar';
+      bar2.className = 'strength-bar';
+      bar3.className = 'strength-bar';
+      bar4.className = 'strength-bar';
+      labelEl.className = 'strength-label';
+      textEl.textContent = 'Password strength';
+
+      let score = 0;
+      if (password.length >= 8) score++;
+      if (password.length >= 12) score++;
+      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+      if (/\d/.test(password)) score++;
+      if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+      if (score >= 4) {
+        bar1.classList.add('strong');
+        bar2.classList.add('strong');
+        bar3.classList.add('strong');
+        bar4.classList.add('strong');
+        labelEl.classList.add('strong');
+        textEl.textContent = 'Strong';
+      } else if (score >= 3) {
+        bar1.classList.add('medium');
+        bar2.classList.add('medium');
+        bar3.classList.add('medium');
+        labelEl.classList.add('medium');
+        textEl.textContent = 'Medium';
+      } else if (score >= 2) {
+        bar1.classList.add('medium');
+        bar2.classList.add('medium');
+        labelEl.classList.add('medium');
+        textEl.textContent = 'Fair';
+      } else {
+        bar1.classList.add('weak');
+        labelEl.classList.add('weak');
+        textEl.textContent = 'Weak';
+      }
+    }
+
     async function handleResetPassword(e) {
       e.preventDefault();
-      const form = e.target;
+      const form = e.currentTarget;
       const btn = document.getElementById('reset-btn');
 
       const newPassword = form.new_password.value;
       const confirmPassword = form.confirm_password.value;
 
       if (newPassword.length < 8) {
-        showToast('Password must be at least 8 characters', 'error');
+        toast('Password must be at least 8 characters', 'error');
         return;
       }
 
       if (!/[A-Z]/.test(newPassword)) {
-        showToast('Password must contain at least one uppercase letter', 'error');
+        toast('Password must contain at least one uppercase letter', 'error');
         return;
       }
 
       if (!/[0-9]/.test(newPassword)) {
-        showToast('Password must contain at least one number', 'error');
+        toast('Password must contain at least one number', 'error');
         return;
       }
 
       if (newPassword !== confirmPassword) {
-        showToast('Passwords do not match', 'error');
+        toast('Passwords do not match', 'error');
         return;
       }
 
@@ -386,22 +579,23 @@ if (!empty($token) && !empty($email)) {
             csrf_token: form.csrf_token.value,
             token: form.dataset.resetToken,
             email: form.dataset.resetEmail,
-            new_password: newPassword
+            new_password: newPassword,
+            confirm_password: confirmPassword
           }).toString()
         });
 
         const data = await res.json();
 
         if (data.success) {
-          showToast('Password updated! Redirecting...', 'success');
+          toast('Password updated! Redirecting...', 'success');
           setTimeout(() => window.location.href = 'index.php', 1500);
         } else {
-          showToast(data.message || 'Failed to update password', 'error');
+          toast(data.message || 'Failed to update password', 'error');
           btn.disabled = false;
           btn.textContent = 'Update Password';
         }
       } catch (err) {
-        showToast('Network error. Please try again.', 'error');
+        toast('Network error. Please try again.', 'error');
         btn.disabled = false;
         btn.textContent = 'Update Password';
       }

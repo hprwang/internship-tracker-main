@@ -132,8 +132,7 @@ internship-tracker/
 ├── companies.php             ← Browse companies
 ├── progress.php              ← Weekly progress logging
 ├── calendar.php              ← Calendar & timeline view
-├── profile.php               ← Student profile
-├── change_password.php       ← Password change
+├── profile.php               ← Student profile (incl. change password modal)
 ├── reset_password.php        ← Password reset (token link)
 ├── css/
 │   └── style.css             ← Global dark-theme styles

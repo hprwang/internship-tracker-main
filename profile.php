@@ -4,6 +4,16 @@ require_once 'php/config.php';
 $user = requireAuth();
 require_once __DIR__ . '/php/partials/header.php';
 $csrf = generateCSRF();
+
+ensureAchievementsTable();
+$achievements = [];
+try {
+    $stmt = Database::getConnection()->prepare("SELECT id, title, achievement_date FROM achievements WHERE student_id = ? ORDER BY created_at DESC");
+    $stmt->execute([(int)$user['id']]);
+    $achievements = $stmt->fetchAll();
+} catch (Exception $e) {
+    error_log('profile achievements: ' . $e->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
@@ -200,8 +210,12 @@ $csrf = generateCSRF();
     .achievement-list { display: flex; flex-direction: column; gap: 0.75rem; }
     .achievement-item { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-panel); border-radius: 12px; border-left: 3px solid var(--green-neon); }
     .achievement-icon { font-size: 1.5rem; }
+    .achievement-info { flex: 1; min-width: 0; }
     .achievement-info h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.2rem; }
     .achievement-info p { font-size: 0.8rem; color: var(--text-muted); }
+    .achievement-delete, .achievement-save { width: 32px; height: 32px; flex-shrink: 0; background: transparent; border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+    .achievement-delete:hover { border-color: rgba(239,68,68,0.4); color: #F87171; background: rgba(239,68,68,0.08); }
+    .achievement-save:hover { border-color: var(--green-neon); color: var(--green-neon); background: rgba(34,197,94,0.08); }
 
     /* Analytics Chart */
     .chart-container { height: 180px; display: flex; align-items: flex-end; gap: 0.75rem; padding-top: 1rem; }
@@ -234,11 +248,31 @@ $csrf = generateCSRF();
       .profile-header { flex-direction: column; text-align: center; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
+
+    /* Change Password Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+    .modal-overlay.open { display: flex; }
+    .modal-overlay .modal { width: 100%; max-width: 440px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
+    .modal-overlay .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); }
+    .modal-overlay .modal-header h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); }
+    .modal-overlay .modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1; }
+    .modal-overlay .modal-close:hover { color: #F87171; }
+    .modal-overlay .modal-body { padding: 1.5rem; }
+    .modal-overlay .modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1.25rem 1.5rem; border-top: 1px solid var(--border-subtle); }
+    .modal-overlay .form-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: none; letter-spacing: normal; }
+    .modal-overlay .form-control { width: 100%; padding: 0.75rem 1rem; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.9rem; font-family: inherit; transition: all 0.2s; }
+    .modal-overlay .form-control:focus { outline: none; border-color: var(--green-neon); box-shadow: 0 0 0 3px rgba(34,197,94,0.15); }
+    .modal-overlay .form-control::placeholder { color: var(--text-muted); }
+    .modal-overlay .btn-primary { background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); color: var(--bg-deep); font-weight: 700; border: none; box-shadow: none; }
+    .modal-overlay .btn-primary:hover { background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); color: var(--bg-deep); box-shadow: 0 0 25px rgba(34,197,94,0.5); transform: translateY(-2px); }
+    .modal-overlay .btn-secondary { background: var(--bg-panel); border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 0.75rem 1.5rem; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; font-size: 0.9rem; box-shadow: none; }
+    .modal-overlay .btn-secondary:hover { border-color: var(--green-neon); color: var(--green-neon); }
 </style>
 </head>
 <body>
   <canvas id="starfield" aria-hidden="true"></canvas>
   <div class="bg-effects"></div>
+  <div id="toast-container" class="toast-container"></div>
   <div class="profile-layout">
     <!-- Sidebar -->
     <aside class="sidebar">
@@ -300,34 +334,6 @@ $csrf = generateCSRF();
             <span class="meta-item"><span><i class="fas fa-envelope"></i></span> <input type="email" name="email" value="<?= e($user['email'] ?? '') ?>" class="edit-input mini"></span>
             <span class="meta-item"><span><i class="fas fa-map-marker-alt"></i></span> <input type="text" name="location" value="" placeholder="Add location" class="edit-input mini"></span>
           </div>
-        </div>
-      </div>
-
-      <!-- Quick Stats -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Applications</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Interviews</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Offers</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Active</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Completed</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">0%</div>
-          <div class="stat-label">Success Rate</div>
         </div>
       </div>
 
@@ -456,10 +462,24 @@ $csrf = generateCSRF();
         <div class="info-card">
           <div class="card-header">
             <h3 class="card-title"><i class="fas fa-trophy"></i> Achievements</h3>
+            <button type="button" class="doc-action" onclick="addAchievement()"><i class="fas fa-plus"></i> Add</button>
           </div>
           <div class="card-body">
             <div class="achievement-list" id="achievement-list">
-              <div class="empty-message">No achievements added yet</div>
+              <?php if (empty($achievements)): ?>
+                <div class="empty-message">No achievements added yet</div>
+              <?php else: ?>
+                <?php foreach ($achievements as $a): ?>
+                  <div class="achievement-item" data-id="<?= (int)$a['id'] ?>">
+                    <span class="achievement-icon"><i class="fas fa-medal"></i></span>
+                    <div class="achievement-info">
+                      <h4><?= e($a['title']) ?></h4>
+                      <p><?= $a['achievement_date'] !== '' ? e($a['achievement_date']) : '' ?></p>
+                    </div>
+                    <button type="button" class="achievement-delete" onclick="deleteAchievement(<?= (int)$a['id'] ?>)" title="Remove"><i class="fas fa-trash"></i></button>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
             </div>
           </div>
         </div>
@@ -526,7 +546,7 @@ $csrf = generateCSRF();
           </div>
           <div class="card-body">
             <div class="settings-list">
-              <a href="change_password.php" class="settings-item" style="text-decoration:none;color:inherit">
+              <div class="settings-item" onclick="openChangePasswordModal()">
                 <div class="settings-left">
                   <span class="settings-icon"><i class="fas fa-key"></i></span>
                   <div class="settings-text">
@@ -535,7 +555,7 @@ $csrf = generateCSRF();
                   </div>
                 </div>
                 <button type="button" class="doc-action">Change</button>
-              </a>
+              </div>
               <div class="settings-item">
                 <div class="settings-left">
                   <span class="settings-icon"><i class="fas fa-shield-alt"></i></span>
@@ -546,21 +566,42 @@ $csrf = generateCSRF();
                 </div>
                 <button type="button" class="doc-action">Enable</button>
               </div>
-              <div class="settings-item">
-                <div class="settings-left">
-                  <span class="settings-icon"><i class="fas fa-user-shield"></i></span>
-                  <div class="settings-text">
-                    <h4>Privacy Settings</h4>
-                    <p>Control your profile visibility</p>
-                  </div>
-                </div>
-                <button type="button" class="doc-action">Configure</button>
-              </div>
             </div>
           </div>
         </div>
 
     </main>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div class="modal-overlay" id="change-password-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Change Password</h2>
+        <button type="button" class="modal-close" onclick="closeChangePasswordModal()" aria-label="Close">&times;</button>
+      </div>
+      <form id="change-password-form">
+        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input type="password" name="current_password" class="form-control" placeholder="Enter current password" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Password</label>
+            <input type="password" name="new_password" class="form-control" placeholder="Min. 8 chars, 1 uppercase, 1 number" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" placeholder="Confirm new password" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeChangePasswordModal()">Cancel</button>
+          <button type="submit" id="change-password-submit" class="btn btn-primary">Update Password</button>
+        </div>
+      </form>
+    </div>
   </div>
 </body>
 </html>
@@ -602,20 +643,105 @@ $csrf = generateCSRF();
   }
 
   // Achievement add functionality
+  function esc(value) {
+    const div = document.createElement('div');
+    div.textContent = value || '';
+    return div.innerHTML;
+  }
+
   function addAchievement() {
     const list = document.getElementById('achievement-list');
     const empty = list.querySelector('.empty-message');
     if (empty) empty.remove();
+    if (list.querySelector('.achievement-item.editing')) return;
     const item = document.createElement('div');
-    item.className = 'achievement-item';
+    item.className = 'achievement-item editing';
     item.innerHTML = `
 <span class="achievement-icon"><i class="fas fa-medal"></i></span>
       <div class="achievement-info">
-        <input type="text" name="achievements[]" placeholder="Achievement title" class="edit-input">
-        <input type="text" name="achievement_dates[]" placeholder="Date" class="edit-input mini" style="margin-top:0.25rem">
+        <input type="text" id="new-achievement-title" class="edit-input" placeholder="Achievement title">
+        <input type="text" id="new-achievement-date" class="edit-input mini" placeholder="Date" style="margin-top:0.25rem">
       </div>
+      <button type="button" class="achievement-save" onclick="saveAchievement()" title="Save"><i class="fas fa-check"></i></button>
+      <button type="button" class="achievement-delete" onclick="this.closest('.achievement-item').remove()" title="Cancel"><i class="fas fa-times"></i></button>
     `;
     list.appendChild(item);
+    document.getElementById('new-achievement-title').focus();
+  }
+
+  async function saveAchievement() {
+    const title = document.getElementById('new-achievement-title').value.trim();
+    const date = document.getElementById('new-achievement-date').value.trim();
+    if (!title) { toast('Please enter an achievement title', 'error'); return; }
+
+    const fd = new FormData();
+    fd.append('action', 'achievement_add');
+    fd.append('csrf_token', App.csrfToken);
+    fd.append('title', title);
+    fd.append('achievement_date', date);
+
+    try {
+      const res = await fetch('php/profile.php', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.success) {
+        toast('Achievement added!', 'success');
+        loadAchievements();
+      } else {
+        toast(data.message || 'Failed to add achievement', 'error');
+      }
+    } catch (err) {
+      toast('Network error. Please try again.', 'error');
+    }
+  }
+
+  async function deleteAchievement(id) {
+    if (!confirm('Remove this achievement?')) return;
+    const fd = new FormData();
+    fd.append('action', 'achievement_delete');
+    fd.append('id', id);
+    fd.append('csrf_token', App.csrfToken);
+
+    try {
+      const res = await fetch('php/profile.php', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.success) {
+        toast('Achievement removed.', 'success');
+        loadAchievements();
+      } else {
+        toast(data.message || 'Failed to remove achievement', 'error');
+      }
+    } catch (err) {
+      toast('Network error. Please try again.', 'error');
+    }
+  }
+
+  function loadAchievements() {
+    fetch('php/profile.php?action=achievement_list', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) return;
+        const list = document.getElementById('achievement-list');
+        list.innerHTML = '';
+        if (!data.achievements.length) {
+          list.innerHTML = '<div class="empty-message">No achievements added yet</div>';
+          return;
+        }
+        data.achievements.forEach(a => {
+          const item = document.createElement('div');
+          item.className = 'achievement-item';
+          item.dataset.id = a.id;
+          item.innerHTML = `
+<span class="achievement-icon"><i class="fas fa-medal"></i></span>
+            <div class="achievement-info">
+              <h4>${esc(a.title)}</h4>
+              <p>${esc(a.achievement_date || '')}</p>
+            </div>
+            <button type="button" class="achievement-delete" onclick="deleteAchievement(${a.id})" title="Remove"><i class="fas fa-trash"></i></button>
+          `;
+          list.appendChild(item);
+        });
+      })
+      .catch(err => console.error('Load achievements error:', err));
   }
 
   // Make chips toggle on click
@@ -626,5 +752,61 @@ $csrf = generateCSRF();
       const checkbox = this.querySelector('input');
       if (checkbox) checkbox.checked = this.classList.contains('selected');
     });
+  });
+
+  // Change Password Modal
+  function openChangePasswordModal() {
+    const modal = document.getElementById('change-password-modal');
+    if (modal) { modal.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  }
+  function closeChangePasswordModal() {
+    const modal = document.getElementById('change-password-modal');
+    if (modal) { modal.classList.remove('open'); document.body.style.overflow = ''; }
+  }
+  document.getElementById('change-password-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeChangePasswordModal();
+  });
+
+  document.getElementById('change-password-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = document.getElementById('change-password-submit');
+
+    const currentPassword = form.current_password.value;
+    const newPassword = form.new_password.value;
+    const confirmPassword = form.confirm_password.value;
+
+    if (newPassword.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
+    if (!/[A-Z]/.test(newPassword)) { toast('Password must contain at least one uppercase letter', 'error'); return; }
+    if (!/[0-9]/.test(newPassword)) { toast('Password must contain at least one number', 'error'); return; }
+    if (newPassword !== confirmPassword) { toast('Passwords do not match', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    try {
+      const res = await fetch('php/auth.php?action=change_password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          csrf_token: form.csrf_token.value,
+          current_password: currentPassword,
+          new_password: newPassword
+        }).toString()
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast('Password updated successfully!', 'success');
+        closeChangePasswordModal();
+        form.reset();
+      } else {
+        toast(data.message || 'Failed to update password', 'error');
+      }
+    } catch (err) {
+      toast('Network error. Please try again.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Update Password';
+    }
   });
 </script>
