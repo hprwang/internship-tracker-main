@@ -190,10 +190,9 @@ internship-tracker/
 - ✅ In-app notification bell
 
 ### For Companies
-- ✅ Company account & profile management
-- ✅ Post internship opportunities (active / closed / pending)
-- ✅ Review applications and update their status
-- ✅ Dashboard with KPIs and application analytics
+- ✅ Company accounts are not currently supported — the company portal was removed.
+  Company-related workflows (posting internships, reviewing applications) are handled
+  by administrators from the admin panel instead.
 
 ### For Admins
 - ✅ See all students' internships
