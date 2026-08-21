@@ -93,8 +93,8 @@ $csrf = generateCSRF();
     .job-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .job-tag { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.75rem; color: var(--text-secondary); }
     .job-tag i { margin-right: 0.35rem; color: var(--green-neon); }
-    .job-desc { color: var(--text-secondary); font-size: 0.87rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-    .job-requirements { color: var(--text-muted); font-size: 0.82rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .job-desc { color: var(--text-secondary); font-size: 0.87rem; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .job-requirements { color: var(--text-muted); font-size: 0.82rem; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .job-requirements strong { color: var(--text-secondary); }
     .job-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
     .apply-btn { background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); color: var(--bg-deep); font-weight: 700; padding: 0.6rem 1.4rem; border: none; border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition); font-size: 0.9rem; }
