@@ -707,6 +707,7 @@ $csrf = generateCSRF();
         <form
           action="php/auth.php"
           onsubmit="handleRegister(event)"
+          data-on-success="redirect:index.php"
         >
           <input type="hidden" name="role_hint" value="student">
 
