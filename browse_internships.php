@@ -65,7 +65,14 @@ $csrf = generateCSRF();
     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-subtle); }
     .page-title { font-size: 1.8rem; font-weight: 700; }
     .page-title span { color: var(--green-neon); }
-    .header-actions { display: flex; align-items: center; gap: 1rem; }
+.header-actions {
+        display: none;
+      }
+      .header-icons {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
     .icon-btn { width: 40px; height: 40px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition); font-size: 1.1rem; }
     .icon-btn:hover { border-color: var(--green-neon); box-shadow: 0 0 15px rgba(34,197,94,0.15); }
 
@@ -185,9 +192,15 @@ $csrf = generateCSRF();
     <main class="main-content">
       <header class="page-header">
         <h1 class="page-title">Browse <span>Internships</span></h1>
-        <div class="header-actions">
-          <?= renderNotifBell($user) ?>
-          <button class="icon-btn" onclick="window.location.href='profile.php'" title="Profile"><i class="fas fa-user" style="color:#22C55E;"></i></button>
+        <div class="header-icons">
+          <span class="header-notif"><?= renderNotifBell($user) ?></span>
+          <div class="header-user-icon">
+            <button class="icon-btn" onclick="window.location.href='profile.php'" title="Profile"><i class="fas fa-user" style="color:#22C55E;"></i></button>
+          </div>
+          <button class="icon-btn" id="refresh-apps" onclick="refreshApplications()" title="Refresh applications"><i class="fas fa-refresh"></i></button>
+          <div class="refresh-indicator" id="refresh-indicator" style="display:none;">
+            <span class="dot"></span><span>Auto-refresh</span>
+          </div>
         </div>
       </header>
 
@@ -214,6 +227,7 @@ $csrf = generateCSRF();
           <table class="data-table">
             <thead>
               <tr>
+                <th><span class="animated-checkbox" role="checkbox" tabindex="0" id="check-all-header"></span></th>
                 <th>Internship</th>
                 <th>Company</th>
                 <th>Location</th>
@@ -283,6 +297,8 @@ $csrf = generateCSRF();
   <script>
     let allJobs = [];
     let allApplications = [];
+    let refreshInterval = null;
+    const selectedApps = new Set();
 
     async function loadJobs() {
       try {
@@ -441,7 +457,7 @@ $csrf = generateCSRF();
       if (allApplications.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="6" class="empty-state">
+            <td colspan="7" class="empty-state">
               <div class="empty-icon"><i class="fas fa-inbox"></i></div>
               <h3 class="empty-title">No applications yet</h3>
               <p class="empty-text">Browse open internships and apply to see your applications here.</p>
@@ -451,11 +467,12 @@ $csrf = generateCSRF();
       }
       tbody.innerHTML = allApplications.map(app => {
         const stipend = parseFloat(app.stipend);
-        const stipendDisplay = stipend > 0 ? 'Rs. ' + stipend.toLocaleString() : 'Unpaid';
+        const stipendDisplay = stipend > 0 ? 'NPR ' + Math.round(stipend) : 'Unpaid';
         const status = app.status || 'pending';
         const date = app.applied_at ? new Date(app.applied_at).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' }) : '—';
         return `
         <tr>
+          <td><span class="animated-checkbox" role="checkbox" tabindex="0" data-app-id="${app.id}"></span></td>
           <td><strong>${escapeHtml(app.internship_title)}</strong></td>
           <td>${escapeHtml(app.company_name)}</td>
           <td>${escapeHtml(app.internship_location || '—')}</td>
@@ -471,10 +488,54 @@ $csrf = generateCSRF();
       document.getElementById('tab-apps').classList.toggle('active', tab === 'apps');
       document.getElementById('tab-open-panel').style.display = tab === 'open' ? 'block' : 'none';
       document.getElementById('tab-apps-panel').style.display = tab === 'apps' ? 'block' : 'none';
-      if (tab === 'apps') loadApplications();
+      if (tab === 'apps') {
+        loadApplications();
+        startAutoRefresh();
+      } else {
+        stopAutoRefresh();
+      }
+    }
+
+    function refreshApplications() {
+      stopAutoRefresh();
+      loadApplications();
+      startAutoRefresh();
+      showRefreshIndicator(true);
+    }
+
+    function startAutoRefresh() {
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => {
+        loadApplications();
+      }, 60000);
+      showRefreshIndicator(true);
+    }
+
+    function stopAutoRefresh() {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+      showRefreshIndicator(false);
+    }
+
+    function showRefreshIndicator(show) {
+      const btn = document.getElementById('refresh-apps');
+      const indicator = document.getElementById('refresh-indicator');
+      if (show) {
+        btn.style.display = 'inline-flex';
+        if (indicator) indicator.style.display = 'flex';
+      } else {
+        btn.style.display = 'none';
+        if (indicator) indicator.style.display = 'none';
+      }
     }
 
     loadJobs();
+    // Auto-refresh applications when on the apps tab
+    if (document.getElementById('tab-apps').classList.contains('active')) {
+      startAutoRefresh();
+    }
   </script>
 </body>
 </html>

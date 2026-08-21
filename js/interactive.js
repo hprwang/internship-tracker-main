@@ -407,28 +407,59 @@ Interactive.setupBulkActions = function() {
       row.dataset.selected = 'false';
     });
 
-    // Check all logic
+    // Check all logic — query rows from tbody each time so dynamically added rows are included
     const checkAllEl = document.getElementById('check-all');
     checkAllEl.addEventListener('click', function() {
       const checked = !this.classList.contains('checked');
       this.classList.toggle('checked');
+      const tbody = table.querySelector('tbody');
+      const rows = tbody ? tbody.querySelectorAll('tr') : [];
       rows.forEach(row => {
         const cb = row.querySelector('.animated-checkbox');
-        cb.classList.toggle('checked', checked);
-        row.dataset.selected = checked ? 'true' : 'false';
+        if (cb) {
+          cb.classList.toggle('checked', checked);
+          row.dataset.selected = checked ? 'true' : 'false';
+        }
       });
+      // Update the selectedApps Set when check-all is toggled
+      if (window.selectedApps) {
+        if (checked) {
+          // Get all app IDs from rows and add them to the Set
+          const appIds = new Set();
+          rows.forEach(row => {
+            const appId = row.dataset.appId;
+            if (appId) appIds.add(appId);
+          });
+          window.selectedApps.clear();
+          appIds.forEach(id => window.selectedApps.add(id));
+        } else {
+          window.selectedApps.clear();
+        }
+      }
       updateBulkBar();
     });
 
-    // Individual checkboxes
-    rows.forEach(row => {
-      const cb = row.querySelector('.animated-checkbox');
-      cb.addEventListener('click', function(e) {
-        e.stopPropagation();
-        this.classList.toggle('checked');
-        row.dataset.selected = this.classList.contains('checked') ? 'true' : 'false';
-        updateBulkBar();
-      });
+    // Individual checkboxes using event delegation on table (persists across DOM updates)
+    table.addEventListener('click', function(e) {
+      const target = e.target.closest('.animated-checkbox');
+      if (!target) return;
+      // Don't handle header checkbox clicks via delegation
+      if (target.closest('thead')) return;
+      const row = target.closest('tr');
+      if (!row) return;
+      const checked = !target.classList.contains('checked');
+      target.classList.toggle('checked');
+      row.dataset.selected = checked ? 'true' : 'false';
+      // Update the selectedApps Set
+      if (window.selectedApps) {
+        const appId = row.dataset.appId;
+        if (checked) {
+          window.selectedApps.add(appId);
+        } else {
+          window.selectedApps.delete(appId);
+        }
+      }
+      updateBulkBar();
     });
 
     const updateBulkBar = () => {
@@ -511,16 +542,8 @@ Interactive.setupFilePreview = function() {
 Interactive.setupAutoRefresh = function() {
   const refreshInterval = 60000; // every 60 seconds
 
-  // Add refresh indicator
-  const topHeader = document.querySelector('.top-header, .page-header, .topbar');
-  if (topHeader) {
-    const indicator = document.createElement('div');
-    indicator.className = 'refresh-indicator';
-    indicator.id = 'refresh-indicator';
-    indicator.innerHTML = '<span class="dot"></span><span>Auto-refresh</span>';
-    indicator.style.display = 'none';
-    topHeader.appendChild(indicator);
-  }
+  // Avoid duplicate: refresh-indicator is added in HTML
+  if (document.getElementById('refresh-indicator')) return;
 };
 
 /* ── Touch Optimization ───────────────────────────── */
