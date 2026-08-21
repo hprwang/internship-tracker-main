@@ -295,7 +295,7 @@ function handleSendOtp(): void {
               . '<p style="color:#A1A1AA;font-size:14px;">This code expires in 10 minutes. If you did not request it, you can safely ignore this email.</p>'
               . '</div>';
 
-    $sent = sendMailViaSMTP($email, '', $subject, $bodyHtml, $bodyText);
+    $sent = sendMail($email, '', $subject, $bodyText, $bodyHtml);
     if (!$sent) {
         jsonResponse(false, 'We could not send the verification email. Please try again.');
     }

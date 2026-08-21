@@ -6,61 +6,13 @@ require_once __DIR__ . '/php/partials/header.php';
 $csrf = generateCSRF();
 $isAdmin = $user['role'] === 'admin';
 
-// Fetch dashboard data server-side
-$db = Database::getConnection();
+// Fetch dashboard data server-side (same helper the AJAX refresh endpoint uses,
+// so the first paint and every live refresh are always in sync)
 $userId = (int)$user['id'];
-
-// Get stats
-$totalApps = 0;
-$byStatus = [];
-$recentInternships = [];
-$upcomingInterviews = [];
-
-try {
-    // Get total
-    $totalStmt = $db->prepare("SELECT COUNT(*) FROM internships WHERE student_id = ?");
-    $totalStmt->execute([$userId]);
-    $totalApps = (int)$totalStmt->fetchColumn();
-
-    // Get by status (for non-admin, only their own)
-    $statusStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM internships WHERE student_id = ? GROUP BY status");
-    $statusStmt->execute([$userId]);
-    while ($row = $statusStmt->fetch()) {
-        $byStatus[$row['status']] = (int)$row['cnt'];
-    }
-
-    // Get recent internships
-    $recentStmt = $db->prepare("
-        SELECT i.title, i.status, i.start_date, c.name as company_name
-        FROM internships i
-        JOIN companies c ON i.company_id = c.id
-        WHERE i.student_id = ?
-        ORDER BY i.created_at DESC LIMIT 5
-    ");
-    $recentStmt->execute([$userId]);
-    $recentInternships = $recentStmt->fetchAll();
-
-    // Get upcoming interviews
-    $interviewStmt = $db->prepare("
-        SELECT i.title, i.start_date, c.name as company_name
-        FROM internships i
-        JOIN companies c ON i.company_id = c.id
-        WHERE i.student_id = ? AND i.status = 'interview'
-        ORDER BY i.start_date ASC LIMIT 3
-    ");
-    $interviewStmt->execute([$userId]);
-    $upcomingInterviews = $interviewStmt->fetchAll();
-} catch (Exception $e) {
-    error_log("Dashboard data error: " . $e->getMessage());
-}
-
-// Encode data for JavaScript
-$dashboardData = json_encode([
-    'total' => $totalApps,
-    'byStatus' => $byStatus,
-    'recent' => $recentInternships,
-    'interviews' => $upcomingInterviews
-], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$dashboardData = json_encode(
+    studentDashboardData($userId),
+    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+);
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
@@ -898,6 +850,9 @@ $dashboardData = json_encode([
       </header>
 
       <!-- Statistics Cards -->
+      <div style="display:flex;justify-content:flex-end;margin-top:0.75rem;">
+        <span id="dash-live-status" title="Live"><span class="dot"></span> Live</span>
+      </div>
       <div class="kpi-grid" id="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-header">
@@ -1026,6 +981,36 @@ $dashboardData = json_encode([
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- My Applications (submitted via Browse Internships) -->
+      <div class="dash-card" style="margin-top:1.5rem;">
+        <div class="dash-card-header">
+          <div>
+            <h3 class="dash-card-title">My Applications</h3>
+            <p class="dash-card-subtitle">Applications you've submitted to company-posted internships</p>
+          </div>
+          <div style="display:flex;gap:.75rem;align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="window.location.href='browse_internships.php'"><i class="fas fa-search"></i> Browse Internships</button>
+          </div>
+        </div>
+        <div class="dash-card-body">
+          <table class="data-table" data-no-bulk>
+            <thead>
+              <tr>
+                <th>Internship</th>
+                <th>Company</th>
+                <th>Status</th>
+                <th>Applied On</th>
+              </tr>
+            </thead>
+            <tbody id="my-applications-list">
+              <tr>
+                <td colspan="4" class="loading-message">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1306,6 +1291,11 @@ $dashboardData = json_encode([
     color: #F87171;
     border: 1px solid rgba(239,68,68,0.3);
   }
+  .status-badge.under_review {
+    background: rgba(96,165,250,0.15);
+    color: #60A5FA;
+    border: 1px solid rgba(96,165,250,0.3);
+  }
   .activity-item {
     display: flex;
     align-items: flex-start;
@@ -1400,94 +1390,204 @@ $dashboardData = json_encode([
 
 <script>
 var dashboardData = <?= $dashboardData ?>;
-console.log('Dashboard data:', dashboardData);
 
 (function() {
-  var data = dashboardData || { total: 0, byStatus: {}, recent: [], interviews: [] };
+  var dashInPhpFolder = window.location.pathname.includes('/php/');
+  var dashStatsUrl = (dashInPhpFolder ? '' : 'php/') + 'internships.php?action=dashboard';
+  var refreshTimer = null;
+  var isFetching = false;
 
-  // Update KPI cards
-  document.getElementById('kpi-total').textContent = data.total || 0;
-  document.getElementById('kpi-ongoing').textContent = data.byStatus.ongoing || 0;
-  document.getElementById('kpi-interviews').textContent = data.byStatus.interview || 0;
-  document.getElementById('kpi-completed').textContent = data.byStatus.completed || 0;
+  // Renders the KPI cards, bar chart, recent applications table, activity
+  // list and upcoming interviews from a dashboard data object. Called on
+  // first paint with the server-rendered data, and again every time fresh
+  // data is fetched (after add/edit/delete, on an interval, and when the
+  // tab regains focus) so the page never goes stale.
+  function renderDashboardData(data) {
+    data = data || { total: 0, byStatus: {}, recent: [], interviews: [] };
 
-  // Update bar chart
-  var total = data.total || 1;
-  var maxBar = 100;
-  var statuses = ['applied', 'interview', 'accepted', 'ongoing', 'completed', 'rejected'];
-  statuses.forEach(function(status) {
-    var count = data.byStatus[status] || 0;
-    var el = document.getElementById('bar-' + status);
-    var fill = document.getElementById('bar-fill-' + status);
-    if (el) el.textContent = count;
-    if (fill) fill.style.height = Math.max(8, (count / total) * maxBar) + 'px';
-  });
+    // Update KPI cards
+    document.getElementById('kpi-total').textContent = data.total || 0;
+    document.getElementById('kpi-ongoing').textContent = data.byStatus.ongoing || 0;
+    document.getElementById('kpi-interviews').textContent = data.byStatus.interview || 0;
+    document.getElementById('kpi-completed').textContent = data.byStatus.completed || 0;
 
-  // Update recent applications table
-  var tbody = document.getElementById('recent-applications');
-  if (data.recent && data.recent.length > 0) {
-    var html = '';
-    data.recent.forEach(function(app) {
-      var status = app.status || '-';
-      html += '<tr>';
-      html += '<td>' + (app.title || '-') + '</td>';
-      html += '<td>' + (app.company_name || '-') + '</td>';
-      html += '<td><span class="status-badge ' + status + '">' + status + '</span></td>';
-      html += '<td>' + (app.start_date ? new Date(app.start_date).toLocaleDateString() : '-') + '</td>';
-      html += '</tr>';
+    // Update bar chart
+    var total = data.total || 1;
+    var maxBar = 100;
+    var statuses = ['applied', 'interview', 'accepted', 'ongoing', 'completed', 'rejected'];
+    statuses.forEach(function(status) {
+      var count = data.byStatus[status] || 0;
+      var el = document.getElementById('bar-' + status);
+      var fill = document.getElementById('bar-fill-' + status);
+      if (el) el.textContent = count;
+      if (fill) fill.style.height = Math.max(8, (count / total) * maxBar) + 'px';
     });
-    tbody.innerHTML = html;
-  } else {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-message">No internships yet</td></tr>';
-  }
 
-  // Update activity list
-  var activityContainer = document.getElementById('activity-list');
-  var iconMap = {
-    applied: { icon: '&#128229;', cls: 'apply' },
-    interview: { icon: '&#127919;', cls: 'interview' },
-    accepted: { icon: '&#10004;', cls: 'accept' },
-    ongoing: { icon: '&#9889;', cls: 'complete' },
-    completed: { icon: '&#9989;', cls: 'complete' },
-    rejected: { icon: '&#10008;', cls: 'reject' }
-  };
-  if (data.recent && data.recent.length > 0) {
-    var html = '';
-    data.recent.forEach(function(app) {
-      var info = iconMap[app.status] || iconMap.applied;
-      html += '<div class="activity-item">';
-      html += '<div class="activity-icon ' + info.cls + '">' + info.icon + '</div>';
-      html += '<div class="activity-content">';
-      html += '<div class="activity-title">' + (app.title || 'Internship') + '</div>';
-      html += '<div class="activity-meta">' + (app.company_name || '-') + ' &bull; ' + (app.status || 'pending') + '</div>';
-      html += '</div></div>';
-    });
-    activityContainer.innerHTML = html;
-  } else {
-    activityContainer.innerHTML = '<div class="empty-message">No activity yet</div>';
-  }
+    // Update recent applications table
+    var tbody = document.getElementById('recent-applications');
+    if (tbody) {
+      if (data.recent && data.recent.length > 0) {
+        var html = '';
+        data.recent.forEach(function(app) {
+          var status = app.status || '-';
+          html += '<tr>';
+          html += '<td>' + (app.title || '-') + '</td>';
+          html += '<td>' + (app.company_name || '-') + '</td>';
+          html += '<td><span class="status-badge ' + status + '">' + status + '</span></td>';
+          html += '<td>' + (app.start_date ? new Date(app.start_date).toLocaleDateString() : '-') + '</td>';
+          html += '</tr>';
+        });
+        tbody.innerHTML = html;
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-message">No internships yet</td></tr>';
+      }
+    }
 
-  // Update upcoming interviews
-  var interviewContainer = document.getElementById('interview-list');
-  if (data.interviews && data.interviews.length > 0) {
-    var html = '';
-    data.interviews.forEach(function(app) {
-      var startDate = app.start_date ? new Date(app.start_date) : null;
+    // Update activity list
+    var activityContainer = document.getElementById('activity-list');
+    var iconMap = {
+      applied: { icon: '&#128229;', cls: 'apply' },
+      interview: { icon: '&#127919;', cls: 'interview' },
+      accepted: { icon: '&#10004;', cls: 'accept' },
+      ongoing: { icon: '&#9889;', cls: 'complete' },
+      completed: { icon: '&#9989;', cls: 'complete' },
+      rejected: { icon: '&#10008;', cls: 'reject' }
+    };
+    if (activityContainer) {
+      if (data.recent && data.recent.length > 0) {
+        var html = '';
+        data.recent.forEach(function(app) {
+          var info = iconMap[app.status] || iconMap.applied;
+          html += '<div class="activity-item">';
+          html += '<div class="activity-icon ' + info.cls + '">' + info.icon + '</div>';
+          html += '<div class="activity-content">';
+          html += '<div class="activity-title">' + (app.title || 'Internship') + '</div>';
+          html += '<div class="activity-meta">' + (app.company_name || '-') + ' &bull; ' + (app.status || 'pending') + '</div>';
+          html += '</div></div>';
+        });
+        activityContainer.innerHTML = html;
+      } else {
+        activityContainer.innerHTML = '<div class="empty-message">No activity yet</div>';
+      }
+    }
+
+    // Update upcoming interviews
+    var interviewContainer = document.getElementById('interview-list');
+    if (interviewContainer) {
+      if (data.interviews && data.interviews.length > 0) {
+        var html = '';
+        data.interviews.forEach(function(app) {
+          var startDate = app.start_date ? new Date(app.start_date) : null;
+          var now = new Date();
+          var days = startDate ? Math.ceil((startDate - now) / (1000 * 60 * 60 * 24)) : 0;
+          html += '<div class="interview-item">';
+          html += '<div class="interview-info">';
+          html += '<h4>' + (app.title || 'Interview') + '</h4>';
+          html += '<p>' + (app.company_name || '-') + '</p>';
+          html += '</div>';
+          html += '<div class="interview-time">';
+          html += '<div class="days">' + (days > 0 ? days + 'd' : 'Today') + '</div>';
+          html += '<span class="label">' + (startDate ? startDate.toLocaleDateString() : 'TBD') + '</span>';
+          html += '</div></div>';
+        });
+        interviewContainer.innerHTML = html;
+      } else {
+        interviewContainer.innerHTML = '<div class="empty-message">No upcoming interviews</div>';
+      }
+    }
+
+    // Update "My Applications" table (submitted via Browse Internships)
+    var appsTbody = document.getElementById('my-applications-list');
+    if (appsTbody) {
+      if (data.myApplications && data.myApplications.length > 0) {
+        var html = '';
+        data.myApplications.forEach(function(app) {
+          var status = app.status || 'pending';
+          html += '<tr>';
+          html += '<td>' + (app.internship_title || '-') + '</td>';
+          html += '<td>' + (app.company_name || '-') + '</td>';
+          html += '<td><span class="status-badge ' + status + '">' + status.replace('_', ' ') + '</span></td>';
+          html += '<td>' + (app.applied_at ? new Date(app.applied_at).toLocaleDateString() : '-') + '</td>';
+          html += '</tr>';
+        });
+        appsTbody.innerHTML = html;
+      } else {
+        appsTbody.innerHTML = '<tr><td colspan="4" class="empty-message">No applications yet — <a href="browse_internships.php" style="color:var(--green-neon)">browse internships</a> to get started</td></tr>';
+      }
+    }
+
+    var liveEl = document.getElementById('dash-live-status');
+    if (liveEl) {
       var now = new Date();
-      var days = startDate ? Math.ceil((startDate - now) / (1000 * 60 * 60 * 24)) : 0;
-      html += '<div class="interview-item">';
-      html += '<div class="interview-info">';
-      html += '<h4>' + (app.title || 'Interview') + '</h4>';
-      html += '<p>' + (app.company_name || '-') + '</p>';
-      html += '</div>';
-      html += '<div class="interview-time">';
-      html += '<div class="days">' + (days > 0 ? days + 'd' : 'Today') + '</div>';
-      html += '<span class="label">' + (startDate ? startDate.toLocaleDateString() : 'TBD') + '</span>';
-      html += '</div></div>';
-    });
-    interviewContainer.innerHTML = html;
-  } else {
-    interviewContainer.innerHTML = '<div class="empty-message">No upcoming interviews</div>';
+      liveEl.title = 'Last updated ' + now.toLocaleTimeString();
+    }
   }
+
+  // Pulls fresh data from the server and re-renders. This intentionally
+  // overrides the generic loadDashboard() defined in js/app.js (which targets
+  // a different, unused set of element IDs) so that every place that already
+  // calls loadDashboard() after saving/editing/deleting an internship — plus
+  // the polling below — actually refreshes what's on screen.
+  window.loadDashboard = async function loadDashboard() {
+    if (isFetching) return;
+    isFetching = true;
+    var liveEl = document.getElementById('dash-live-status');
+    if (liveEl) liveEl.classList.add('syncing');
+    try {
+      var res = await fetch(dashStatsUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      var payload = await res.json();
+      if (payload && payload.success) {
+        renderDashboardData(payload);
+      }
+    } catch (err) {
+      // Silent: keep showing the last known-good data rather than blanking the UI.
+    } finally {
+      isFetching = false;
+      if (liveEl) liveEl.classList.remove('syncing');
+    }
+  };
+
+  function startAutoRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(function() {
+      if (document.visibilityState === 'visible') window.loadDashboard();
+    }, 20000); // keep KPIs, charts, and lists live without a manual reload
+  }
+
+  // First paint: render immediately with the data the server already fetched
+  // (no network round-trip needed), then start live refreshing.
+  renderDashboardData(dashboardData);
+  startAutoRefresh();
+
+  // Also refresh the moment the tab becomes visible again (e.g. switching
+  // back from another tab where an internship was added/updated).
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') window.loadDashboard();
+  });
 })();
 </script>
+<style>
+  #dash-live-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  #dash-live-status .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green-neon);
+    box-shadow: 0 0 8px rgba(34,197,94,0.7);
+    animation: dash-live-pulse 2s ease-in-out infinite;
+  }
+  #dash-live-status.syncing .dot { animation-duration: 0.6s; }
+  @keyframes dash-live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.8); }
+  }
+</style>

@@ -198,7 +198,7 @@ $csrf = generateCSRF();
             <button class="icon-btn" onclick="window.location.href='profile.php'" title="Profile"><i class="fas fa-user" style="color:#22C55E;"></i></button>
           </div>
           <button class="icon-btn" id="refresh-apps" onclick="refreshApplications()" title="Refresh applications"><i class="fas fa-refresh"></i></button>
-          <div class="refresh-indicator" id="refresh-indicator" style="display:none;">
+          <div class="refresh-indicator">
             <span class="dot"></span><span>Auto-refresh</span>
           </div>
         </div>
@@ -430,6 +430,8 @@ $csrf = generateCSRF();
         btn.disabled = false;
         btn.textContent = 'Submit Application';
       }
+      // Refresh dashboard after application submission
+      refreshDashboard();
     });
 
     async function loadApplications() {

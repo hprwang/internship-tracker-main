@@ -627,6 +627,99 @@ function studentAnalyticsData(int $userId): array {
     ];
 }
 
+/**
+ * Live student dashboard data (KPIs, status breakdown, recent applications,
+ * upcoming interviews). Shared by the initial server render in dashboard.php
+ * and the AJAX refresh endpoint so both always return identical data.
+ */
+function studentDashboardData(int $userId): array {
+    $db = Database::getConnection();
+    $total = 0;
+    $byStatus = [];
+    $recent = [];
+    $interviews = [];
+    $myApplications = [];
+
+    try {
+        $totalStmt = $db->prepare("SELECT COUNT(*) FROM internships WHERE student_id = ?");
+        $totalStmt->execute([$userId]);
+        $total = (int)$totalStmt->fetchColumn();
+
+        $statusStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM internships WHERE student_id = ? GROUP BY status");
+        $statusStmt->execute([$userId]);
+        while ($row = $statusStmt->fetch()) {
+            $byStatus[$row['status']] = (int)$row['cnt'];
+        }
+
+        $recentStmt = $db->prepare("
+            SELECT i.title, i.status, i.start_date, c.name as company_name
+            FROM internships i
+            JOIN companies c ON i.company_id = c.id
+            WHERE i.student_id = ?
+            ORDER BY i.created_at DESC LIMIT 5
+        ");
+        $recentStmt->execute([$userId]);
+        $recent = $recentStmt->fetchAll();
+
+        $interviewStmt = $db->prepare("
+            SELECT i.title, i.start_date, c.name as company_name
+            FROM internships i
+            JOIN companies c ON i.company_id = c.id
+            WHERE i.student_id = ? AND i.status = 'interview'
+            ORDER BY i.start_date ASC LIMIT 3
+        ");
+        $interviewStmt->execute([$userId]);
+        $interviews = $interviewStmt->fetchAll();
+
+        // Applications submitted through Browse Internships (job-board postings
+        // published by companies) — a separate table from the student's own
+        // manually-tracked internships above, so it needs its own query.
+        $appsStmt = $db->prepare("
+            SELECT a.id, a.status, a.applied_at, ci.title AS internship_title,
+                   ci.location AS internship_location, ci.stipend, c.name AS company_name
+            FROM applications a
+            JOIN company_internships ci ON a.company_internship_id = ci.id
+            JOIN companies c ON ci.company_id = c.id
+            WHERE a.student_id = ?
+            ORDER BY a.applied_at DESC LIMIT 5
+        ");
+        $appsStmt->execute([$userId]);
+        $myApplications = $appsStmt->fetchAll();
+
+        // Fold browse-and-apply application counts into the same KPI/status
+        // totals as the manually-tracked internships above, so "Total
+        // Applications" and the Status Breakdown chart reflect everything
+        // the student has applied to, not just one of the two tables.
+        //   pending, under_review -> "applied" (still waiting to hear back)
+        //   accepted              -> "accepted"
+        //   rejected              -> "rejected"
+        // (applications has no ongoing/completed equivalent — those only
+        // exist once a student is tracking the internship itself.)
+        $appStatusStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM applications WHERE student_id = ? GROUP BY status");
+        $appStatusStmt->execute([$userId]);
+        $appByStatus = [];
+        while ($row = $appStatusStmt->fetch()) {
+            $appByStatus[$row['status']] = (int)$row['cnt'];
+        }
+
+        $appTotal = array_sum($appByStatus);
+        $total += $appTotal;
+        $byStatus['applied']  = ($byStatus['applied']  ?? 0) + ($appByStatus['pending'] ?? 0) + ($appByStatus['under_review'] ?? 0);
+        $byStatus['accepted'] = ($byStatus['accepted'] ?? 0) + ($appByStatus['accepted'] ?? 0);
+        $byStatus['rejected'] = ($byStatus['rejected'] ?? 0) + ($appByStatus['rejected'] ?? 0);
+    } catch (Exception $e) {
+        error_log("Dashboard data error: " . $e->getMessage());
+    }
+
+    return [
+        'total' => $total,
+        'byStatus' => $byStatus,
+        'recent' => $recent,
+        'interviews' => $interviews,
+        'myApplications' => $myApplications,
+    ];
+}
+
 function adminAnalyticsData(): array {
     $db = Database::getConnection();
     $kpis = [

@@ -544,7 +544,6 @@ Interactive.setupAutoRefresh = function() {
 
   // Avoid duplicate: refresh-indicator is added in HTML
   if (document.getElementById('refresh-indicator')) return;
-};
 
 /* ── Touch Optimization ───────────────────────────── */
 Interactive.setupTouchOptimization = function() {

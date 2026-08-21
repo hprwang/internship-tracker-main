@@ -329,7 +329,8 @@ $csrf = generateCSRF();
       border-color: var(--primary-green);
     }
 
-    .form-control:disabled {
+    .form-control:disabled,
+    .form-control:read-only {
       opacity: 0.55;
       cursor: not-allowed;
     }
@@ -369,14 +370,16 @@ $csrf = generateCSRF();
 
     .password-toggle {
       position: absolute;
+      top: 50%;
       right: 0.75rem;
+      transform: translateY(-50%);
       background: none;
       border: none;
       cursor: pointer;
       font-size: 1.05rem;
       padding: 0.25rem;
       color: #C3C7CE;
-      transition: all 0.2s ease;
+      transition: color 0.2s ease, transform 0.2s ease;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -384,7 +387,7 @@ $csrf = generateCSRF();
 
     .password-toggle:hover {
       color: var(--primary-green);
-      transform: scale(1.1);
+      transform: translateY(-50%) scale(1.1);
     }
 
     /* Lock hint shown until email verification completes */
@@ -894,7 +897,9 @@ $csrf = generateCSRF();
         var data = await res.json();
         if (data.success) {
           document.getElementById('email-verified-chip').classList.add('show');
-          document.getElementById('reg-otp').disabled = true;
+          // readOnly (not disabled) keeps the OTP value in the form submission —
+          // disabled fields are excluded from FormData, which broke registration.
+          document.getElementById('reg-otp').readOnly = true;
           document.getElementById('send-otp-btn').disabled = true;
           btn.textContent = 'Verified';
           btn.disabled = true;
@@ -935,7 +940,7 @@ $csrf = generateCSRF();
       var sendBtn = document.getElementById('send-otp-btn');
       var verifyBtn = document.getElementById('verify-otp-btn');
       if (chip) chip.classList.remove('show');
-      if (otp) { otp.disabled = false; otp.value = ''; }
+      if (otp) { otp.disabled = false; otp.readOnly = false; otp.value = ''; }
       if (sendBtn) sendBtn.disabled = true;
       if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.textContent = 'Verify'; }
       var pw = document.getElementById('reg-password');

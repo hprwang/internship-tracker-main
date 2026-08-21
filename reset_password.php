@@ -219,14 +219,16 @@ if (!empty($token) && !empty($email)) {
 
     .password-toggle {
       position: absolute;
+      top: 50%;
       right: 0.75rem;
+      transform: translateY(-50%);
       background: none;
       border: none;
       cursor: pointer;
       font-size: 1rem;
       padding: 0.25rem;
       color: var(--text-muted);
-      transition: all 0.2s ease;
+      transition: color 0.2s ease, transform 0.2s ease;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -234,6 +236,7 @@ if (!empty($token) && !empty($email)) {
 
     .password-toggle:hover {
       color: var(--green-neon);
+      transform: translateY(-50%) scale(1.1);
     }
 
     /* Password strength */

@@ -19,6 +19,7 @@ switch ($action) {
     case 'update':      updateInternship($user, $db);     break;
     case 'delete':      deleteInternship($user, $db);     break;
     case 'stats':       getStats($user, $db);             break;
+    case 'dashboard':   jsonResponse(true, '', studentDashboardData((int)$user['id'])); break;
     case 'log_add':     addProgressLog($user, $db);       break;
     case 'log_delete': deleteProgressLog($user, $db);  break;
     case 'log_list':    getProgressLogs($user, $db);      break;
