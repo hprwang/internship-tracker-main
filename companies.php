@@ -218,6 +218,10 @@ $db = Database::getConnection();
 
     .action-btn.danger:hover { border-color: rgba(239,68,68,0.5); color: #F87171; }
 
+    .company-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.55rem; border-radius: 20px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-left: 0.5rem; vertical-align: middle; }
+    .company-badge.mine { background: rgba(34,197,94,0.15); color: var(--green-glow); }
+    .company-badge.official { background: rgba(107,114,128,0.15); color: #9CA3AF; }
+
     .empty-state { text-align: center; padding: 4rem 2rem; }
 
     .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
@@ -531,6 +535,7 @@ $db = Database::getConnection();
     let allCompanies = [];
     let currentView = 'table';
     const isAdmin = <?= $user['role'] === 'admin' ? 'true' : 'false' ?>;
+    const currentUserId = <?= (int)$user['id'] ?>;
 
     function filterCompanies(industry, btn) {
       currentFilter = industry;
@@ -651,35 +656,39 @@ $db = Database::getConnection();
         `;
         gridView.innerHTML = '';
       } else {
-        const adminActions = isAdmin ? `
-              <button class="action-btn" onclick="editCompany(${c.id})">Edit</button>
-              <button class="action-btn danger" onclick="deleteCompany(${c.id})">Delete</button>
-            ` : '';
-
-        tableList.innerHTML = filtered.map(c => `
+        tableList.innerHTML = filtered.map(c => {
+          const isMine = !isAdmin && Number(c.created_by) === currentUserId;
+          const canManage = isAdmin || isMine;
+          const badge = isMine ? '<span class="company-badge mine">Yours</span>' : (!c.created_by ? '<span class="company-badge official">Official</span>' : '');
+          return `
           <tr>
-            <td class="table-name"><i class="fas fa-building"></i> ${c.name}</td>
+            <td class="table-name"><i class="fas fa-building"></i> ${c.name}${badge}</td>
             <td><span class="company-card-industry ${c.industry || 'other'}">${c.industry || '-'}</span></td>
             <td class="table-location">${c.location || '-'}</td>
             <td>${c.website ? `<a href="${c.website}" target="_blank" class="table-website">${c.website.replace(/^https?:\/\//, '')}</a>` : '-'}</td>
             <td class="table-location">${c.contact_email || '-'}</td>
             <td class="table-actions">
               <button class="action-btn" onclick="viewCompany(${c.id})">View</button>
-              ${isAdmin ? `<button class="action-btn" onclick="editCompany(${c.id})">Edit</button><button class="action-btn danger" onclick="deleteCompany(${c.id})">Delete</button>` : ''}
+              ${canManage ? `<button class="action-btn" onclick="editCompany(${c.id})">Edit</button><button class="action-btn danger" onclick="deleteCompany(${c.id})">Delete</button>` : ''}
             </td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
 
         // Card/Grid view
-        gridView.innerHTML = filtered.map(c => `
+        gridView.innerHTML = filtered.map(c => {
+          const isMine = !isAdmin && Number(c.created_by) === currentUserId;
+          const canManage = isAdmin || isMine;
+          const badge = isMine ? '<span class="company-badge mine">Yours</span>' : (!c.created_by ? '<span class="company-badge official">Official</span>' : '');
+          return `
           <div class="company-card" onclick="viewCompany(${c.id})">
             <div class="company-card-header">
               <div class="company-card-icon"><i class="fas fa-building"></i></div>
               <div class="company-card-actions">
-                ${isAdmin ? `<button class="action-btn" onclick="event.stopPropagation(); editCompany(${c.id})">Edit</button><button class="action-btn danger" onclick="event.stopPropagation(); deleteCompany(${c.id})">Delete</button>` : ''}
+                ${canManage ? `<button class="action-btn" onclick="event.stopPropagation(); editCompany(${c.id})">Edit</button><button class="action-btn danger" onclick="event.stopPropagation(); deleteCompany(${c.id})">Delete</button>` : ''}
               </div>
             </div>
-            <div class="company-card-title">${c.name}</div>
+            <div class="company-card-title">${c.name}${badge}</div>
             <span class="company-card-industry ${c.industry || 'other'}">${c.industry || 'Other'}</span>
             <div class="company-card-details">
               <div class="company-card-detail">
@@ -701,7 +710,8 @@ $db = Database::getConnection();
               ${c.website ? `<a href="${c.website}" target="_blank" class="quick-action-btn" onclick="event.stopPropagation()"><i class="fas fa-external-link-alt"></i> Visit</a>` : ''}
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       }
 
       // Toggle views

@@ -177,16 +177,62 @@ foreach ([
     $cc = ensureCol($pdo, $targetDb, 'companies', $name, $def, $cc);
 }
 
-// dedupe by name before enforcing the unique key (keep lowest id)
-$pdo->exec("DELETE c FROM companies c
-  JOIN companies k ON k.name = c.name AND k.id < c.id");
+// Per-student company ownership: companies.created_by (NULL = official/
+// global, visible to everyone; set = added by that student, visible only
+// to them). See sql/add_company_ownership.php for the full write-up — this
+// mirrors the same idempotent steps inline so a fresh consolidation run
+// ends up with the same shape.
+$cc = columnsOf($pdo, $targetDb, 'companies');
+$cc = ensureCol($pdo, $targetDb, 'companies', 'created_by', 'INT DEFAULT NULL', $cc);
+if (!indexExists($pdo, $targetDb, 'companies', 'idx_created_by')) {
+    $pdo->exec("ALTER TABLE companies ADD INDEX idx_created_by (created_by)");
+}
+if (!isset($cc['owner_bucket'])) {
+    $pdo->exec("ALTER TABLE companies ADD COLUMN owner_bucket INT AS (COALESCE(created_by, 0)) STORED");
+    echo "  + added generated column companies.owner_bucket\n";
+}
 
-// enforce unique name (safe now)
-try {
-    $pdo->exec("ALTER TABLE companies ADD UNIQUE KEY uk_company_name (name)");
-    echo "  + added unique key on companies.name\n";
-} catch (PDOException $e) {
-    // already present or duplicate edge case — continue
+// drop the old table-wide unique key on name, if still present
+if (indexExists($pdo, $targetDb, 'companies', 'uk_company_name')) {
+    $pdo->exec("ALTER TABLE companies DROP INDEX uk_company_name");
+    echo "  + dropped old table-wide unique key uk_company_name\n";
+}
+
+// dedupe within each owner bucket before enforcing the scoped unique key
+// (keep lowest id per (owner_bucket, name) collision)
+$pdo->exec("DELETE c FROM companies c
+  JOIN companies k ON k.name = c.name
+                   AND k.id < c.id
+                   AND COALESCE(k.created_by, 0) = COALESCE(c.created_by, 0)");
+
+// enforce the scoped unique key (safe now)
+if (!indexExists($pdo, $targetDb, 'companies', 'uk_company_owner_name')) {
+    try {
+        $pdo->exec("ALTER TABLE companies ADD UNIQUE KEY uk_company_owner_name (owner_bucket, name)");
+        echo "  + added scoped unique key uk_company_owner_name (owner_bucket, name)\n";
+    } catch (PDOException $e) {
+        // already present or duplicate edge case — continue
+    }
+}
+
+// link created_by back to users(id) — users already exists in the target DB
+// at this point (it's the pre-existing main DB this script extends).
+if (tableExists($pdo, $targetDb, 'users')) {
+    $fkExists = (bool)withInfoSchema($pdo, function () use ($pdo, $targetDb) {
+        $st = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+            WHERE CONSTRAINT_SCHEMA = :db AND CONSTRAINT_NAME = 'fk_companies_created_by'");
+        $st->execute([':db' => $targetDb]);
+        return (int)$st->fetchColumn() > 0;
+    });
+    if (!$fkExists) {
+        try {
+            $pdo->exec("ALTER TABLE companies ADD CONSTRAINT fk_companies_created_by
+                FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL");
+            echo "  + added FK companies.created_by -> users.id\n";
+        } catch (PDOException $e) {
+            echo "  ! could not add FK fk_companies_created_by: {$e->getMessage()}\n";
+        }
+    }
 }
 
 // merge legacy company DB companies (keep existing main records, fill blanks)

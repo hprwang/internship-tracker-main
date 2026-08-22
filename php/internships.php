@@ -23,7 +23,7 @@ switch ($action) {
     case 'log_add':     addProgressLog($user, $db);       break;
     case 'log_delete': deleteProgressLog($user, $db);  break;
     case 'log_list':    getProgressLogs($user, $db);      break;
-    case 'companies':   getCompanies($db);                break;
+    case 'companies':   getCompanies($user, $db);          break;
     case 'add_company': addCompany($user, $db);           break;
     case 'delete_company': deleteCompany($user, $db);      break;
     case 'get_company': getCompany($user, $db);            break;
@@ -127,6 +127,12 @@ function createInternship(array $user, PDO $db): void {
     $studentId = $user['role'] === 'admin' && !empty($_POST['student_id'])
         ? (int)$_POST['student_id'] : $user['id'];
 
+    // Block re-adding the same internship title twice for the same student
+    // (case-insensitive — "Software Intern" and "SOFTWARE INTERN" collide).
+    if (internshipTitleTaken($db, $studentId, trim($_POST['title']))) {
+        jsonResponse(false, 'You already have an internship with this title (titles are not case-sensitive).');
+    }
+
     // Handle file uploads
     $resumePath = '';
     $coverLetterPath = '';
@@ -187,6 +193,24 @@ function createInternship(array $user, PDO $db): void {
     }
 }
 
+/**
+ * True if this student already has another internship with this title
+ * (case-insensitive, trimmed). $excludeId lets updates ignore the row
+ * being edited.
+ */
+function internshipTitleTaken(PDO $db, int $studentId, string $title, int $excludeId = 0): bool {
+    if ($title === '') return false;
+    $sql = "SELECT id FROM internships WHERE student_id = ? AND LOWER(TRIM(title)) = LOWER(TRIM(?))";
+    $params = [$studentId, $title];
+    if ($excludeId > 0) {
+        $sql .= " AND id != ?";
+        $params[] = $excludeId;
+    }
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return (bool)$stmt->fetch();
+}
+
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 function updateInternship(array $user, PDO $db): void {
     if (!verifyCSRF($_POST['csrf_token'] ?? '')) jsonResponse(false, 'Invalid token.');
@@ -206,6 +230,17 @@ function updateInternship(array $user, PDO $db): void {
     }
     if (!in_array($_POST['status'], ['applied','interview','accepted','ongoing','completed','rejected','withdrawn'], true)) {
         jsonResponse(false, 'Invalid status.');
+    }
+
+    // Look up the owning student before the duplicate-title check, since an
+    // admin editing another student's internship must be checked against
+    // that student's titles, not the admin's own.
+    $ownerStmt = $db->prepare("SELECT student_id FROM internships WHERE id = ?");
+    $ownerStmt->execute([$id]);
+    $ownerId = (int)($ownerStmt->fetchColumn() ?: $user['id']);
+
+    if (internshipTitleTaken($db, $ownerId, trim($_POST['title'] ?? ''), $id)) {
+        jsonResponse(false, 'You already have an internship with this title (titles are not case-sensitive).');
     }
 
     $prevStmt = $db->prepare("SELECT student_id, title, status FROM internships WHERE id = ?");
@@ -375,27 +410,80 @@ function deleteProgressLog(array $user, PDO $db): void {
 }
 
 // ── COMPANIES ─────────────────────────────────────────────────────────────────
-function getCompanies(PDO $db): void {
-    $stmt = $db->query("SELECT * FROM companies ORDER BY name");
-    $rows = $stmt->fetchAll();
-    jsonResponse(true, '', ['companies' => $rows]);
+// Visibility rule: a company is either "official" (created_by IS NULL —
+// seeded data, or added by an admin) and visible to everyone, or it was
+// added by a specific student/company user and is visible only to that
+// user. Admins can see and manage everything.
+function isAdminRole(array $user): bool {
+    return in_array($user['role'] ?? '', ['admin', 'super_admin'], true);
+}
+
+function getCompanies(array $user, PDO $db): void {
+    if (isAdminRole($user)) {
+        $stmt = $db->query("SELECT * FROM companies ORDER BY name");
+    } else {
+        $stmt = $db->prepare("SELECT * FROM companies WHERE created_by IS NULL OR created_by = ? ORDER BY name");
+        $stmt->execute([$user['id']]);
+    }
+    jsonResponse(true, '', ['companies' => $stmt->fetchAll()]);
+}
+
+/**
+ * True if a company with this name (case-insensitive, trimmed) already
+ * exists somewhere the given user can see/add to — i.e. the official list,
+ * or their own previously-added companies. $excludeId lets updates ignore
+ * the row being edited.
+ */
+function companyNameTaken(PDO $db, array $user, string $name, int $excludeId = 0): bool {
+    $sql = "SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))";
+    $params = [$name];
+    if (!isAdminRole($user)) {
+        $sql .= " AND (created_by IS NULL OR created_by = ?)";
+        $params[] = $user['id'];
+    }
+    if ($excludeId > 0) {
+        $sql .= " AND id != ?";
+        $params[] = $excludeId;
+    }
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return (bool)$stmt->fetch();
 }
 
 function addCompany(array $user, PDO $db): void {
     if (!verifyCSRF($_POST['csrf_token'] ?? '')) jsonResponse(false, 'Invalid token.');
-    if (empty($_POST['name'])) jsonResponse(false, 'Company name required.');
+    $name = trim($_POST['name'] ?? '');
+    if ($name === '') jsonResponse(false, 'Company name required.');
 
-    $stmt = $db->prepare("INSERT INTO companies (name, industry, website, location, contact_person, contact_email, contact_phone) VALUES (?,?,?,?,?,?,?)");
-    $stmt->execute([
-        trim($_POST['name']),
-        trim($_POST['industry'] ?? ''),
-        trim($_POST['website'] ?? ''),
-        trim($_POST['location'] ?? ''),
-        trim($_POST['contact_person'] ?? ''),
-        trim($_POST['contact_email'] ?? ''),
-        trim($_POST['contact_phone'] ?? ''),
-    ]);
-    jsonResponse(true, 'Company added!', ['id' => $db->lastInsertId()]);
+    if (companyNameTaken($db, $user, $name)) {
+        jsonResponse(false, 'You already have a company with this name (names are not case-sensitive).');
+    }
+
+    // Admin-added companies are official/shared; everyone else's are private
+    // to them until an admin promotes/merges them.
+    $ownerId = isAdminRole($user) ? null : (int)$user['id'];
+
+    try {
+        $stmt = $db->prepare("INSERT INTO companies (name, industry, website, location, contact_person, contact_email, contact_phone, created_by) VALUES (?,?,?,?,?,?,?,?)");
+        $stmt->execute([
+            $name,
+            trim($_POST['industry'] ?? ''),
+            trim($_POST['website'] ?? ''),
+            trim($_POST['location'] ?? ''),
+            trim($_POST['contact_person'] ?? ''),
+            trim($_POST['contact_email'] ?? ''),
+            trim($_POST['contact_phone'] ?? ''),
+            $ownerId,
+        ]);
+        $newId = (int)$db->lastInsertId();
+        logActivity((int)$user['id'], 'add_company', 'company', $newId);
+        jsonResponse(true, 'Company added!', ['id' => $newId]);
+    } catch (Exception $e) {
+        // Most likely the scoped unique key (owner_bucket, name) — a
+        // same-name row slipped in between our check and the insert.
+        error_log("addCompany failed: " . $e->getMessage());
+        jsonResponse(false, 'You already have a company with this name (names are not case-sensitive).');
+    }
 }
 
 function deleteCompany(array $user, PDO $db): void {
@@ -403,37 +491,75 @@ function deleteCompany(array $user, PDO $db): void {
     $id = (int)($_POST['id'] ?? 0);
     if (!$id) jsonResponse(false, 'Company ID required.');
 
-    $stmt = $db->prepare("DELETE FROM companies WHERE id = ? LIMIT 1");
-    $stmt->execute([$id]);
-    jsonResponse(true, 'Company deleted.');
+    if (!isAdminRole($user)) {
+        // Students may only delete companies they personally added — never
+        // official ones and never another student's private companies.
+        $check = $db->prepare("SELECT id FROM companies WHERE id = ? AND created_by = ?");
+        $check->execute([$id, $user['id']]);
+        if (!$check->fetch()) jsonResponse(false, 'Access denied.');
+    }
+
+    try {
+        $stmt = $db->prepare("DELETE FROM companies WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        jsonResponse(true, 'Company deleted.');
+    } catch (Exception $e) {
+        // FK RESTRICT from internships.company_id — company still has
+        // internships tracked against it.
+        error_log("deleteCompany failed: " . $e->getMessage());
+        jsonResponse(false, 'This company still has internships linked to it and cannot be deleted.');
+    }
 }
 
 function updateCompany(array $user, PDO $db): void {
     if (!verifyCSRF($_POST['csrf_token'] ?? '')) jsonResponse(false, 'Invalid token.');
     $id = (int)($_POST['id'] ?? 0);
     if (!$id) jsonResponse(false, 'Company ID required.');
-    if (empty($_POST['name'])) jsonResponse(false, 'Company name required.');
+    $name = trim($_POST['name'] ?? '');
+    if ($name === '') jsonResponse(false, 'Company name required.');
 
-    $stmt = $db->prepare("UPDATE companies SET name = ?, industry = ?, website = ?, location = ?, contact_person = ?, contact_email = ?, contact_phone = ? WHERE id = ? LIMIT 1");
-    $stmt->execute([
-        trim($_POST['name']),
-        trim($_POST['industry'] ?? ''),
-        trim($_POST['website'] ?? ''),
-        trim($_POST['location'] ?? ''),
-        trim($_POST['contact_person'] ?? ''),
-        trim($_POST['contact_email'] ?? ''),
-        trim($_POST['contact_phone'] ?? ''),
-        $id,
-    ]);
-    jsonResponse(true, 'Company updated!', ['id' => $id]);
+    if (!isAdminRole($user)) {
+        // Students may only edit companies they personally added.
+        $check = $db->prepare("SELECT id FROM companies WHERE id = ? AND created_by = ?");
+        $check->execute([$id, $user['id']]);
+        if (!$check->fetch()) jsonResponse(false, 'Access denied.');
+    }
+
+    if (companyNameTaken($db, $user, $name, $id)) {
+        jsonResponse(false, 'You already have a company with this name (names are not case-sensitive).');
+    }
+
+    try {
+        $stmt = $db->prepare("UPDATE companies SET name = ?, industry = ?, website = ?, location = ?, contact_person = ?, contact_email = ?, contact_phone = ? WHERE id = ? LIMIT 1");
+        $stmt->execute([
+            $name,
+            trim($_POST['industry'] ?? ''),
+            trim($_POST['website'] ?? ''),
+            trim($_POST['location'] ?? ''),
+            trim($_POST['contact_person'] ?? ''),
+            trim($_POST['contact_email'] ?? ''),
+            trim($_POST['contact_phone'] ?? ''),
+            $id,
+        ]);
+        jsonResponse(true, 'Company updated!', ['id' => $id]);
+    } catch (Exception $e) {
+        error_log("updateCompany failed: " . $e->getMessage());
+        jsonResponse(false, 'You already have a company with this name (names are not case-sensitive).');
+    }
 }
 
 function getCompany(array $user, PDO $db): void {
     $id = (int)($_POST['id'] ?? 0);
     if (!$id) jsonResponse(false, 'Company ID required.');
 
-    $stmt = $db->prepare("SELECT * FROM companies WHERE id = ? LIMIT 1");
-    $stmt->execute([$id]);
+    if (isAdminRole($user)) {
+        $stmt = $db->prepare("SELECT * FROM companies WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+    } else {
+        // Only official companies or ones this user added themselves.
+        $stmt = $db->prepare("SELECT * FROM companies WHERE id = ? AND (created_by IS NULL OR created_by = ?) LIMIT 1");
+        $stmt->execute([$id, $user['id']]);
+    }
     $company = $stmt->fetch();
     if (!$company) jsonResponse(false, 'Company not found.');
 

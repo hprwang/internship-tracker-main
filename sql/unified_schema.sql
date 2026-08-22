@@ -17,7 +17,8 @@ USE internship_tracker1;
 -- NOTE: this must be created before `users`, which has a foreign key
 -- pointing at companies(id). MySQL/InnoDB refuses to create a foreign
 -- key against a table that doesn't exist yet, so table order here is
--- not just cosmetic.
+-- not just cosmetic. The FK from companies.created_by back to users(id)
+-- is therefore added with an ALTER TABLE further down, once users exists.
 CREATE TABLE IF NOT EXISTS companies (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
@@ -32,11 +33,22 @@ CREATE TABLE IF NOT EXISTS companies (
   phone VARCHAR(50),
   logo_url VARCHAR(255),
   status VARCHAR(20) DEFAULT 'active',
+  -- NULL = official/global company (visible to every student). Set to a
+  -- user id = a company that student added themselves from the Companies
+  -- page or the Add Internship form; visible only to that student (+ admins).
+  created_by INT DEFAULT NULL,
+  -- Generated helper column so the unique key below can treat every
+  -- "global" (created_by IS NULL) row as one shared bucket while still
+  -- giving each student their own bucket. Plain UNIQUE(created_by, name)
+  -- would not work here because MySQL never treats two NULLs as equal,
+  -- which would silently let duplicate official company names back in.
+  owner_bucket INT AS (COALESCE(created_by, 0)) STORED,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_company_name (name),
+  UNIQUE KEY uk_company_owner_name (owner_bucket, name),
   INDEX idx_name (name),
-  INDEX idx_status (status)
+  INDEX idx_status (status),
+  INDEX idx_created_by (created_by)
 ) ENGINE=InnoDB;
 
 -- Users: one table for all people (students, companies, admins)
@@ -79,6 +91,23 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_role (role),
   INDEX idx_company (company_id)
 ) ENGINE=InnoDB;
+
+-- Now that users exists, link companies.created_by back to it. Wrapped so
+-- re-running this file against a database that already has the constraint
+-- (e.g. after sql/add_company_ownership.php) doesn't error out.
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'companies'
+    AND CONSTRAINT_NAME = 'fk_companies_created_by'
+);
+SET @fk_sql := IF(@fk_exists = 0,
+  'ALTER TABLE companies ADD CONSTRAINT fk_companies_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL',
+  'SELECT 1'
+);
+PREPARE fk_stmt FROM @fk_sql;
+EXECUTE fk_stmt;
+DEALLOCATE PREPARE fk_stmt;
 
 -- Internships: student-tracked internship records
 CREATE TABLE IF NOT EXISTS internships (
