@@ -674,12 +674,53 @@ $csrf = generateCSRF();
       from { opacity: 0; transform: translateX(20px); }
       to { opacity: 1; transform: translateX(0); }
     }
+
+    /* Back to landing button */
+    .back-home-btn {
+      position: fixed;
+      top: 1.5rem;
+      left: 1.5rem;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .back-home-btn:hover {
+      color: var(--primary-green);
+      border-color: var(--primary-green);
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .back-home-btn i {
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 968px) {
+      .back-home-btn {
+        top: 1rem;
+        left: 1rem;
+        padding: 0.5rem 0.85rem;
+        font-size: 0.8rem;
+      }
+    }
   </style>
 </head>
 <body>
 
   <div id="toast-container" class="toast-container"></div>
   <div class="bg-effects"></div>
+
+  <a href="landing.php" class="back-home-btn"><i class="fas fa-arrow-left"></i> Back to Home</a>
 
   <div class="login-container">
     <!-- Brand Panel -->

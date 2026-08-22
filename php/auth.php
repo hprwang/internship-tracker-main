@@ -145,6 +145,7 @@ function handleRegister(): void {
     // Validation
     $confirmPassword = trim($_POST['confirm_password'] ?? '');
     if (strlen($fullName) < 2) jsonResponse(false, 'Full name must be at least 2 characters.');
+    if (!preg_match('/^[A-Za-z\s]+$/', $fullName)) jsonResponse(false, 'Full name can only contain letters — no numbers or symbols.');
     if (strlen($username) < 3 || strlen($username) > 100) jsonResponse(false, 'Username must be 3-100 characters.');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonResponse(false, 'Invalid email address.');
     if (strlen($password) < 8) jsonResponse(false, 'Password must be at least 8 characters.');

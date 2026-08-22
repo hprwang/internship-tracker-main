@@ -383,7 +383,7 @@ function profileField(array $u, string $label, string $name, string $placeholder
             <input type="file" id="profile_pic" name="profile_pic" accept="image/*" style="display:none">
           </div>
           <div class="profile-info">
-            <input type="text" name="full_name" value="<?= e($user['full_name']) ?>" class="edit-input name-input">
+            <input type="text" name="full_name" value="<?= e($user['full_name']) ?>" class="edit-input name-input" pattern="[A-Za-z\s]+" title="Letters and spaces only — no numbers or symbols." oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')">
             <p class="student-id">Student ID: <?= e($user['id'] ?? 'STU000000') ?></p>
             <div class="meta">
               <span class="meta-item"><span><i class="fas fa-envelope"></i></span> <input type="email" name="email" value="<?= e($user['email'] ?? '') ?>" class="edit-input mini"></span>
@@ -707,6 +707,11 @@ function profileField(array $u, string $label, string $name, string $placeholder
 
   async function saveProfile(e) {
     if (e) e.preventDefault();
+    var fullNameVal = (document.querySelector('input[name="full_name"]').value || '').trim();
+    if (!/^[A-Za-z\s]+$/.test(fullNameVal)) {
+      toast('Full name can only contain letters — no numbers or symbols.', 'error');
+      return;
+    }
     var btn = document.getElementById('save-profile-btn');
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';

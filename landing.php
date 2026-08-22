@@ -974,7 +974,7 @@ require_once 'php/config.php';
         </div>
         <div class="feature-card">
           <div class="feature-icon"><i class="fas fa-link"></i></div>
-          <h3 class="feature-title">Seamless Connection</h3>
+          <h3 class="feature-title">Effortless Networking</h3>
           <p class="feature-desc">Connect effortlessly with companies, supervisors, and fellow students in one unified platform.</p>
         </div>
         <div class="feature-card">

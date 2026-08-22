@@ -360,6 +360,10 @@ function addUser(string $role): void {
         echo json_encode(['success' => false, 'message' => 'Invalid input data.']);
         return;
     }
+    if (!preg_match('/^[A-Za-z\s]+$/', $fullName)) {
+        echo json_encode(['success' => false, 'message' => 'Full name can only contain letters — no numbers or symbols.']);
+        return;
+    }
 
     // Check duplicates
     $check = $db->prepare("SELECT id FROM users WHERE email = ? OR username = ?");
@@ -386,6 +390,10 @@ function updateUser(): void {
 
     if (!$id || strlen($fullName) < 2) {
         echo json_encode(['success' => false, 'message' => 'Invalid data.']);
+        return;
+    }
+    if (!preg_match('/^[A-Za-z\s]+$/', $fullName)) {
+        echo json_encode(['success' => false, 'message' => 'Full name can only contain letters — no numbers or symbols.']);
         return;
     }
 

@@ -183,7 +183,7 @@ $activeStudents = count(array_filter($students, fn($s) => $s['is_active']));
       <button class="modal-close" onclick="closeModal()">&times;</button>
     </div>
     <form id="modal-form">
-      <div class="form-group"><label class="form-label">Full Name</label><input type="text" name="full_name" class="form-control" required></div>
+      <div class="form-group"><label class="form-label">Full Name</label><input type="text" name="full_name" class="form-control" pattern="[A-Za-z\s]+" title="Letters and spaces only — no numbers or symbols." oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" required></div>
       <div class="form-group"><label class="form-label">Username</label><input type="text" name="username" class="form-control" required></div>
       <div class="form-group"><label class="form-label">Email</label><input type="email" name="email" class="form-control" required></div>
       <div class="form-group"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>

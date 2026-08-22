@@ -545,6 +545,7 @@ async function handleRegister(e) {
   const otpInput = form.querySelector('input[name="otp"]');
 
   if (fullName.length < 2)             { toast('Full name must be at least 2 characters.', 'error'); return; }
+  if (!/^[A-Za-z\s]+$/.test(fullName)) { toast('Full name can only contain letters — no numbers or symbols.', 'error'); return; }
   if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) { toast('Username must be 3–30 alphanumeric characters.', 'error'); return; }
   if (!email.includes('@'))            { toast('Please enter a valid email address.', 'error'); return; }
   if (password.length < 8)            { toast('Password must be at least 8 characters.', 'error'); return; }
@@ -663,9 +664,10 @@ function setPwRequirement(id, met) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.toggle('met', met);
-  el.innerHTML = met
-    ? '<i class="fas fa-check-circle"></i>'
-    : '<i class="far fa-circle"></i>';
+  const icon = el.querySelector('i');
+  if (icon) {
+    icon.className = met ? 'fas fa-check-circle' : 'far fa-circle';
+  }
 }
 
 function checkPasswordMatch() {

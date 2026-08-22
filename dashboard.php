@@ -9,6 +9,21 @@ $isAdmin = $user['role'] === 'admin';
 // Fetch dashboard data server-side (same helper the AJAX refresh endpoint uses,
 // so the first paint and every live refresh are always in sync)
 $userId = (int)$user['id'];
+
+// A "new" account is one created within the last 24 hours — the greeting says
+// "Welcome" for those and "Welcome back" once the account is a day old or more.
+$isNewAccount = false;
+try {
+    $createdStmt = Database::getConnection()->prepare("SELECT created_at FROM users WHERE id = ?");
+    $createdStmt->execute([$userId]);
+    $createdAt = $createdStmt->fetchColumn();
+    if ($createdAt) {
+        $isNewAccount = strtotime($createdAt) > strtotime('-1 day');
+    }
+} catch (Exception $e) {
+    error_log('dashboard created_at check: ' . $e->getMessage());
+}
+
 $dashboardData = json_encode(
     studentDashboardData($userId),
     JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
@@ -836,7 +851,7 @@ $dashboardData = json_encode(
       <!-- Top Header -->
       <header class="top-header">
         <div class="welcome-section">
-          <h1>Welcome back, <span><?= e($user['full_name']) ?></span></h1>
+          <h1><?= $isNewAccount ? 'Welcome' : 'Welcome back' ?>, <span><?= e($user['full_name']) ?></span></h1>
           <p>Track your applications, tasks, deadlines, and internship progress</p>
         </div>
         <div class="header-actions">
