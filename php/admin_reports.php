@@ -16,6 +16,15 @@ if (!function_exists('e')) {
 $csrf = generateCSRF();
 $db = Database::getConnection();
 
+// Selected reporting range, driven by the dashboard's date-range dropdown.
+// Whitelisted so it's safe to interpolate straight into the SQL below.
+$allowedRanges = ['6', '12', 'all'];
+$range = $_GET['range'] ?? '6';
+if (!in_array($range, $allowedRanges, true)) {
+    $range = '6';
+}
+$rangeLabel = $range === 'all' ? 'All time' : "Last {$range} months";
+
 // Get total counts
 $totalStudents = $db->query("SELECT COUNT(*) as cnt FROM users WHERE role = 'student'")->fetch()['cnt'] ?? 0;
 $totalCompanies = $db->query("SELECT COUNT(*) as cnt FROM companies")->fetch()['cnt'] ?? 0;
@@ -28,14 +37,24 @@ $statusCounts = $db->query("
 $statusData = array_column($statusCounts, 'cnt', 'status');
 $statusLabels = array_keys($statusData);
 
-// Applications over time (last 6 months)
-$monthlyApps = $db->query("
-    SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
-    FROM internships
-    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-    GROUP BY month
-    ORDER BY month
-")->fetchAll();
+// Applications over time, scoped to the selected range
+if ($range === 'all') {
+    $monthlyApps = $db->query("
+        SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
+        FROM internships
+        GROUP BY month
+        ORDER BY month
+    ")->fetchAll();
+} else {
+    $rangeMonths = (int)$range;
+    $monthlyApps = $db->query("
+        SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
+        FROM internships
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL {$rangeMonths} MONTH)
+        GROUP BY month
+        ORDER BY month
+    ")->fetchAll();
+}
 
 // Top companies by applications
 $topCompanies = $db->query("
@@ -354,9 +373,9 @@ if ($export === 'csv') {
       </div>
       <div style="display: flex; gap: 0.75rem;">
         <select id="dateRange" onchange="refreshData()" style="padding: 0.5rem 1rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer;">
-          <option value="6">Last 6 Months</option>
-          <option value="12">Last 12 Months</option>
-          <option value="all">All Time</option>
+          <option value="6" <?= $range === '6' ? 'selected' : '' ?>>Last 6 Months</option>
+          <option value="12" <?= $range === '12' ? 'selected' : '' ?>>Last 12 Months</option>
+          <option value="all" <?= $range === 'all' ? 'selected' : '' ?>>All Time</option>
         </select>
 <button onclick="window.location.reload()" class="export-btn"><i class="fas fa-sync-alt"></i> Refresh</button>
         <button onclick="exportToCSV()" class="export-btn" style="background: #22C55E; color: #fff;"><i class="fas fa-download"></i> Export CSV</button>
@@ -491,7 +510,7 @@ if ($export === 'csv') {
       <div class="report-card full-width">
         <div class="report-header">
           <h3 class="report-title">Monthly Applications Trend</h3>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Last 6 months</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);"><?= e($rangeLabel) ?></span>
         </div>
         <div class="report-body" style="height: 250px;">
           <canvas id="monthlyChart"></canvas>

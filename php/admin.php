@@ -232,7 +232,8 @@ switch ($action) {
         $valid = ['pending', 'under_review', 'accepted', 'rejected'];
         if ($id && in_array($status, $valid, true)) {
             $prevStmt = $db->prepare("
-                SELECT a.student_id, a.status, ci.title
+                SELECT a.student_id, a.status, ci.company_id, ci.title, ci.description,
+                       ci.location, ci.stipend
                 FROM applications a
                 JOIN company_internships ci ON a.company_internship_id = ci.id
                 WHERE a.id = ?
@@ -242,6 +243,40 @@ switch ($action) {
 
             $db->prepare("UPDATE applications SET status = ? WHERE id = ?")->execute([$status, $id]);
             logActivity($user['id'], 'update_application_status', 'applications', $id);
+
+            // Progress Logs only reads from the `internships` table (self-logged
+            // internships), which this browse/apply flow never touches. Mirror a
+            // newly-accepted application into that table so the student can
+            // actually pick it and log progress against it.
+            if ($prev && $status === 'accepted' && $prev['status'] !== 'accepted') {
+                $existsStmt = $db->prepare("
+                    SELECT id FROM internships
+                    WHERE student_id = ? AND company_id = ? AND LOWER(TRIM(title)) = LOWER(TRIM(?))
+                ");
+                $existsStmt->execute([$prev['student_id'], $prev['company_id'], $prev['title']]);
+                if (!$existsStmt->fetch()) {
+                    $workMode = stripos((string)$prev['location'], 'remote') !== false ? 'remote' : 'onsite';
+                    $startDate = date('Y-m-d');
+                    $endDate = date('Y-m-d', strtotime('+3 months'));
+                    $db->prepare("
+                        INSERT INTO internships
+                            (student_id, company_id, title, description, start_date, end_date,
+                             status, stipend, work_mode, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?)
+                    ")->execute([
+                        $prev['student_id'],
+                        $prev['company_id'],
+                        $prev['title'],
+                        $prev['description'],
+                        $startDate,
+                        $endDate,
+                        $prev['stipend'] ?? 0,
+                        $workMode,
+                        'Auto-created from an accepted application. Please confirm the actual start/end dates.',
+                    ]);
+                    logActivity($user['id'], 'auto_add_internship', 'internships', (int)$db->lastInsertId());
+                }
+            }
 
             if ($prev && $prev['student_id'] && $prev['status'] !== $status) {
                 notify(
