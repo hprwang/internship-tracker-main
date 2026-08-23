@@ -210,7 +210,7 @@ $todayLogs = count(array_filter($activities, fn($a) => substr($a['created_at'] ?
             </td>
             <td><span class="action-badge"><?= e(str_replace('_', ' ', $a['action'])) ?></span></td>
             <td>
-              <div><?= e($a['entity_type'] ?? '-') ?></div>
+              <div><?= e(!empty($a['entity_type']) ? $a['entity_type'] : '-') ?></div>
               <?php if (!empty($a['entity_id'])): ?>
               <div class="entity-chip">#<?= (int)$a['entity_id'] ?></div>
               <?php endif; ?>
