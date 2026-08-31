@@ -26,6 +26,26 @@ $completedInternships = $db->query("SELECT COUNT(*) as c FROM company_internship
 $pendingApps = $db->query("SELECT COUNT(*) as c FROM company_internships WHERE status = 'pending'")->fetch()['c'] ?? 0;
 $totalApplicants = $db->query("SELECT COUNT(*) as c FROM applications")->fetch()['c'] ?? 0;
 
+// Trend context: items added in the last 7 days (shown as chips on the stat cards)
+$newStudents   = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'student' AND created_at >= NOW() - INTERVAL 7 DAY")->fetchColumn();
+$newCompanies  = (int)$db->query("SELECT COUNT(*) FROM companies WHERE created_at >= NOW() - INTERVAL 7 DAY")->fetchColumn();
+$newApplicants = (int)$db->query("SELECT COUNT(*) FROM applications WHERE applied_at >= NOW() - INTERVAL 7 DAY")->fetchColumn();
+
+// Share-of-total context for the status cards (avoid division by zero)
+$totalPosts  = max((int)$totalInternships, 1);
+$pctActive    = $totalInternships > 0 ? (int)round($activeInternships / $totalPosts * 100) : 0;
+$pctCompleted = $totalInternships > 0 ? (int)round($completedInternships / $totalPosts * 100) : 0;
+$pctPending   = $totalInternships > 0 ? (int)round($pendingApps / $totalPosts * 100) : 0;
+
+/** Small "+N this week" chip under a stat value; renders a neutral state at zero. */
+function trendChip(int $n, string $noun): void {
+    if ($n > 0) {
+        echo '<div class="stat-trend up"><i class="fas fa-arrow-trend-up"></i> +' . $n . ' new ' . $noun . ' this week</div>';
+    } else {
+        echo '<div class="stat-trend"><i class="fas fa-minus"></i> No new ' . $noun . ' this week</div>';
+    }
+}
+
 // Analytics KPI values (same data sources as php/analytics.php) so the block is never empty/stuck
 $kpiStudents     = (int)$db->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn();
 $kpiCompanies    = (int)$db->query("SELECT COUNT(*) FROM companies")->fetchColumn();
@@ -134,7 +154,10 @@ $recentInternships = $db->query("
     .page-title { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
     .page-title span { color: var(--green-neon); }
     .page-subtitle { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.35rem; }
-    .header-actions { display: flex; gap: 0.5rem; }
+    .header-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .header-meta { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.85rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+    .header-meta i { color: var(--green-neon); font-size: 0.75rem; }
+    .header-meta-sep { color: var(--text-muted); }
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.625rem 1.25rem; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all var(--transition); border: none; text-decoration: none; letter-spacing: -0.01em; }
     .btn-primary { background: #16a34a; color: #fff; border: 1px solid rgba(34,197,94,0.4); box-shadow: 0 0 12px rgba(34,197,94,0.25); border-radius: 8px; }
@@ -148,7 +171,7 @@ $recentInternships = $db->query("
     .stats-section { margin-bottom: 1.25rem; }
     .stats-section:last-child { margin-bottom: 2rem; }
     .stats-subheader { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
-    .stats-subtitle { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
+    .stats-subtitle { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-secondary); }
     .stats-subheader::before { content: ''; width: 20px; height: 2px; background: var(--green-neon); border-radius: 2px; }
     .stat-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.5rem; transition: all var(--transition); position: relative; overflow: hidden; animation: cardSlideIn 0.5s ease-out backwards; }
     .stat-card:nth-child(1) { animation-delay: 0.05s; }
@@ -162,17 +185,27 @@ $recentInternships = $db->query("
     .stat-card:hover::before { opacity: 1; }
     .stat-card:hover::after { opacity: 1; }
     .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
-    .stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+    .stat-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
     .stat-icon { width: 36px; height: 36px; background: linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1rem; border: 1px solid rgba(34,197,94,0.15); transition: all var(--transition); }
     .stat-card:hover .stat-icon { background: rgba(34,197,94,0.2); border-color: var(--green-neon); transform: scale(1.1); }
     .stat-value { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; transition: all var(--transition); }
     .stat-value.active { color: var(--green-neon); text-shadow: 0 0 20px rgba(34,197,94,0.4); }
-    .stat-trend { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; margin-top: 0.5rem; }
+    .stat-value.green { color: #22C55E; }
+    .stat-value.blue  { color: #60A5FA; }
+    .stat-value.amber { color: #F59E0B; }
+    .stat-trend { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; margin-top: 0.5rem; color: var(--text-secondary); }
     .stat-trend.up { color: var(--green-neon); }
     .stat-trend.down { color: #F87171; }
+    .stat-trend i { font-size: 0.62rem; }
 
-    /* Dashboard Grid */
-    .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+    /* Status color legend (matches .status-badge colors) */
+    .status-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.85rem; padding: 0.65rem 1rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+    .legend-item { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; font-weight: 500; color: var(--text-secondary); }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Dashboard Grid — 2 columns so "Recent Students" and "Recent Companies"
+       fill the row with no dead space to the right */
+    .dashboard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
     .dash-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden; transition: all var(--transition); position: relative; animation: cardSlideIn 0.5s ease-out backwards; }
     .dash-card:nth-child(1) { animation-delay: 0.3s; }
     .dash-card:nth-child(2) { animation-delay: 0.4s; }
@@ -190,7 +223,7 @@ $recentInternships = $db->query("
     .dash-card-body { padding: 0; }
 
     .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th { text-align: left; padding: 0.875rem 1.25rem; font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); }
+    .data-table th { text-align: left; padding: 0.875rem 1.25rem; font-size: 0.7rem; font-weight: 600; color: #B4B4BE; text-transform: uppercase; letter-spacing: 0.08em; background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); }
     .data-table td { padding: 1rem 1.25rem; font-size: 0.875rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); transition: background var(--transition); }
     .data-table tr:last-child td { border-bottom: none; }
     .data-table tbody tr { transition: all var(--transition); }
@@ -204,6 +237,12 @@ $recentInternships = $db->query("
     .status-badge.completed { background: rgba(96,165,250,0.12); color: #60A5FA; border: 1px solid rgba(96,165,250,0.25); }
     .status-badge.rejected { background: rgba(239,68,68,0.12); color: #F87171; border: 1px solid rgba(239,68,68,0.25); }
     .status-badge.applicant-badge { background: rgba(139,92,246,0.12); color: #A78BFA; border: 1px solid rgba(139,92,246,0.25); }
+
+    /* Card search box (client-side table filter) */
+    .card-search { display: flex; align-items: center; gap: 0.55rem; padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--bg-card); }
+    .card-search i { color: var(--text-muted); font-size: 0.75rem; }
+    .card-search input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 0.8rem; font-family: inherit; }
+    .card-search input::placeholder { color: #8E8E99; }
 
     /* Checkbox columns + bulk action bar */
     .col-check { width: 42px; text-align: center; }
@@ -223,11 +262,16 @@ $recentInternships = $db->query("
     .span-all { grid-column: 1 / -1; }
 
     /* Table cell truncation */
-    .text-truncate { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .table-scroll { overflow-x: auto; overflow-y: auto; max-height: 340px; }
-    .table-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-    .table-scroll::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 8px; }
-    .table-scroll::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+    .text-truncate { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Wrapping cell for location columns — long locations wrap instead of being cut off */
+    .text-wrap { min-width: 120px; max-width: 260px; white-space: normal; word-break: break-word; }
+
+    /* Scrollable table area with a clearly visible, styled scrollbar */
+    .table-scroll { overflow-x: auto; overflow-y: auto; max-height: 340px; scrollbar-width: thin; scrollbar-color: var(--border-light) var(--bg-panel); }
+    .table-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+    .table-scroll::-webkit-scrollbar-track { background: var(--bg-panel); border-radius: 8px; }
+    .table-scroll::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 8px; border: 2px solid var(--bg-panel); }
+    .table-scroll::-webkit-scrollbar-thumb:hover { background: #3D3D46; }
     .data-table { width: 100%; }
     .pos-duration { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.7rem; font-weight: 500; margin-top: 0.2rem; }
     .pos-duration i { font-size: 0.6rem; color: var(--green-neon); }
@@ -279,7 +323,6 @@ $recentInternships = $db->query("
     /* Responsive */
     @media (max-width: 1200px) {
       .stats-grid { grid-template-columns: repeat(3, 1fr); }
-      .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 768px) {
       .admin-layout { grid-template-columns: 1fr; }
@@ -323,6 +366,11 @@ $recentInternships = $db->query("
       </div>
       <div class="header-actions">
         <?= renderNotifBell($user) ?>
+        <span class="header-meta" title="Current date and time the page was rendered">
+          <i class="fas fa-calendar-day"></i> <?= date('D, j M Y') ?>
+          <span class="header-meta-sep">·</span>
+          Updated <?= date('g:i A') ?>
+        </span>
         <button class="btn btn-secondary" id="refresh-btn" onclick="handleRefresh(event)"><i class="fas fa-sync-alt"></i> Refresh</button>
       </div>
     </div>
@@ -337,6 +385,7 @@ $recentInternships = $db->query("
             <div class="stat-icon"><i class="fas fa-users"></i></div>
           </div>
           <div class="stat-value"><?= $totalStudents ?></div>
+          <?php trendChip($newStudents, 'students'); ?>
         </div>
         <div class="stat-card">
           <div class="stat-header">
@@ -344,13 +393,15 @@ $recentInternships = $db->query("
             <div class="stat-icon"><i class="fas fa-building"></i></div>
           </div>
           <div class="stat-value"><?= $totalCompanies ?></div>
+          <?php trendChip($newCompanies, 'companies'); ?>
         </div>
         <div class="stat-card">
           <div class="stat-header">
             <span class="stat-label">Total Applicants</span>
             <div class="stat-icon"><i class="fas fa-users"></i></div>
           </div>
-          <div class="stat-value" style="color:#22C55E"><?= $totalApplicants ?></div>
+          <div class="stat-value green"><?= $totalApplicants ?></div>
+          <?php trendChip($newApplicants, 'applications'); ?>
         </div>
       </div>
     </div>
@@ -365,21 +416,32 @@ $recentInternships = $db->query("
             <div class="stat-icon"><i class="fas fa-bolt"></i></div>
           </div>
           <div class="stat-value active"><?= $activeInternships ?></div>
+          <div class="stat-trend"><i class="fas fa-chart-pie"></i> <?= $pctActive ?>% of <?= (int)$totalInternships ?> total</div>
         </div>
         <div class="stat-card">
           <div class="stat-header">
             <span class="stat-label">Completed Internships</span>
             <div class="stat-icon"><i class="fas fa-check"></i></div>
           </div>
-          <div class="stat-value" style="color:#60A5FA"><?= $completedInternships ?></div>
+          <div class="stat-value blue"><?= $completedInternships ?></div>
+          <div class="stat-trend"><i class="fas fa-chart-pie"></i> <?= $pctCompleted ?>% of <?= (int)$totalInternships ?> total</div>
         </div>
         <div class="stat-card">
           <div class="stat-header">
             <span class="stat-label">Pending Internships</span>
             <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
           </div>
-          <div class="stat-value" style="color:#F59E0B"><?= $pendingApps ?></div>
+          <div class="stat-value amber"><?= $pendingApps ?></div>
+          <div class="stat-trend"><i class="fas fa-chart-pie"></i> <?= $pctPending ?>% of <?= (int)$totalInternships ?> total</div>
         </div>
+      </div>
+      <!-- Color legend so the status badges read at a glance -->
+      <div class="status-legend" aria-label="Status color legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#22C55E"></span> Active</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#F59E0B"></span> Pending</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#60A5FA"></span> Completed / Closed</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#F87171"></span> Rejected</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#A78BFA"></span> Applicants count</span>
       </div>
     </div>
 
@@ -392,6 +454,10 @@ $recentInternships = $db->query("
           <a href="admin_students.php" class="dash-card-link">View All <i class="fas fa-arrow-right"></i></a>
         </div>
         <div class="bulk-bar" data-bulkbar="students"><span class="bulk-count">0</span> selected<div class="bulk-actions"><button type="button" class="btn btn-sm btn-bulk-delete bulk-delete"><i class="fas fa-trash-alt"></i> Delete Selected</button></div></div>
+        <div class="card-search">
+          <i class="fas fa-search"></i>
+          <input type="text" placeholder="Search students by name or email…" data-table-search="students" aria-label="Search students">
+        </div>
         <div class="dash-card-body">
           <div class="table-scroll">
           <table class="data-table" data-bulk="students" data-no-bulk>
@@ -415,13 +481,17 @@ $recentInternships = $db->query("
           <a href="admin_companies.php" class="dash-card-link">View All <i class="fas fa-arrow-right"></i></a>
         </div>
         <div class="bulk-bar" data-bulkbar="companies"><span class="bulk-count">0</span> selected<div class="bulk-actions"><button type="button" class="btn btn-sm btn-bulk-delete bulk-delete"><i class="fas fa-trash-alt"></i> Delete Selected</button></div></div>
+        <div class="card-search">
+          <i class="fas fa-search"></i>
+          <input type="text" placeholder="Search companies by name, industry or location…" data-table-search="companies" aria-label="Search companies">
+        </div>
         <div class="dash-card-body">
           <div class="table-scroll">
           <table class="data-table" data-bulk="companies" data-no-bulk>
             <thead><tr><th class="col-check"><input type="checkbox" class="check-all" aria-label="Select all"></th><th>Name</th><th>Industry</th><th>Location</th></tr></thead>
             <tbody>
               <?php if($recentCompanies): foreach($recentCompanies as $c): ?>
-              <tr><td class="col-check"><input type="checkbox" class="row-check" value="<?= (int)$c['id'] ?>" aria-label="Select row"></td><td class="text-truncate" title="<?= e($c['name']) ?>"><?= e($c['name']) ?></td><td class="text-truncate" title="<?= e($c['industry'] ?? '-') ?>"><?= e($c['industry'] ?? '-') ?></td><td class="text-truncate" title="<?= e($c['location'] ?? '-') ?>"><?= e($c['location'] ?? '-') ?></td></tr>
+              <tr><td class="col-check"><input type="checkbox" class="row-check" value="<?= (int)$c['id'] ?>" aria-label="Select row"></td><td class="text-truncate" title="<?= e($c['name']) ?>"><?= e($c['name']) ?></td><td class="text-truncate" title="<?= e($c['industry'] ?? '-') ?>"><?= e($c['industry'] ?? '-') ?></td><td class="text-wrap" title="<?= e($c['location'] ?? '-') ?>"><?= e($c['location'] ?? '-') ?></td></tr>
               <?php endforeach; else: ?>
               <tr><td colspan="4" class="empty-message">No companies yet</td></tr>
               <?php endif; ?>
@@ -653,6 +723,19 @@ function setupBulkTable(key) {
   });
 }
 Object.keys(BULK_ACTIONS).forEach(setupBulkTable);
+
+// Client-side search filter for the dashboard tables
+document.querySelectorAll('[data-table-search]').forEach(input => {
+  const table = document.querySelector('.data-table[data-bulk="' + input.dataset.tableSearch + '"]');
+  if (!table) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      if (tr.querySelector('.empty-message')) return; // keep empty-state row visible
+      tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+});
 
 // Refresh button: spinner + disabled while refreshing
 function handleRefresh(e) {

@@ -89,17 +89,18 @@ switch ($action) {
         break;
 
     case 'add_company':
-        $name = trim($_POST['name'] ?? '');
+        // Collapse repeated whitespace so "TechNova   Ltd" and "TechNova Ltd" match
+        $name = trim(preg_replace('/\s+/', ' ', $_POST['name'] ?? ''));
         if (!$name) {
             echo json_encode(['success' => false, 'message' => 'Company name required.']);
             break;
         }
         $cDb = Database::getConnection();
-        // Check for duplicate
-        $check = $cDb->prepare("SELECT id FROM companies WHERE name = ?");
+        // Check for duplicate (case-insensitive, e.g. "TechNova" vs "technova")
+        $check = $cDb->prepare("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(?)");
         $check->execute([$name]);
         if ($check->fetch()) {
-            echo json_encode(['success' => false, 'message' => 'Company already exists.']);
+            echo json_encode(['success' => false, 'message' => 'Company already exists (names are not case-sensitive).']);
             break;
         }
         $stmt = $cDb->prepare("INSERT INTO companies (name, industry, website, location, email, phone, description, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -120,10 +121,22 @@ switch ($action) {
     case 'edit_company':
     case 'update_company':
         $id = (int)($_POST['id'] ?? 0);
+        $name = trim(preg_replace('/\s+/', ' ', $_POST['name'] ?? ''));
+        if (!$id || $name === '') {
+            echo json_encode(['success' => false, 'message' => 'Invalid data.']);
+            break;
+        }
         $cDb = Database::getConnection();
+        // Block renames that would collide with another company (case-insensitive)
+        $check = $cDb->prepare("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(?) AND id != ?");
+        $check->execute([$name, $id]);
+        if ($check->fetch()) {
+            echo json_encode(['success' => false, 'message' => 'Another company already uses this name (names are not case-sensitive).']);
+            break;
+        }
         $stmt = $cDb->prepare("UPDATE companies SET name=?, industry=?, website=?, location=?, email=?, phone=?, description=?, status=? WHERE id=?");
         $stmt->execute([
-            trim($_POST['name'] ?? ''),
+            $name,
             trim($_POST['industry'] ?? ''),
             trim($_POST['website'] ?? ''),
             trim($_POST['location'] ?? ''),
