@@ -918,7 +918,7 @@ require_once 'php/config.php';
       Welcome to <span class="highlight">Internship Tracking System</span>
     </h1>
     <p class="hero-subtitle">
-      Your complete platform for managing internships — <span>Students</span> can track their journey and <span>Admins</span> can oversee everything.
+      Your complete platform for managing internships — <span>Students</span> can track their journey.
     </p>
     <div class="hero-cta">
       <a href="#login" class="btn-hero">Get Started</a>
