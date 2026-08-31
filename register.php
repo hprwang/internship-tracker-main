@@ -723,10 +723,9 @@ $csrf = generateCSRF();
           <div class="brand-logo-text">Intern<span>Track</span></div>
         </div>
         <h1 class="brand-title">Track every step of <span>your internship.</span></h1>
-        <p class="brand-subtitle">Students log progress, hit milestones, and stay on top of deadlines. Admins monitor everything — all in one secure workspace.</p>
+        <p class="brand-subtitle">Students log progress, hit milestones, and stay on top of deadlines.</p>
         <div class="brand-stats">
           <div class="brand-stat"><strong>Real-time</strong><span>dashboards</span></div>
-          <div class="brand-stat"><strong>All roles</strong><span>one platform</span></div>
           <div class="brand-stat"><strong>Secure</strong><span>by design</span></div>
         </div>
       </div>

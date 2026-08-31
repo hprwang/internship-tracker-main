@@ -996,7 +996,7 @@ require_once 'php/config.php';
       <div class="login-grid" style="grid-template-columns: 1fr; max-width: 420px;">
         <div class="login-card">
           <div class="login-card-icon"><i class="fas fa-right-to-bracket"></i></div>
-          <h3 class="login-card-title">One Login, Every Role</h3>
+          <h3 class="login-card-title">Login</h3>
           <p class="login-card-desc">Sign in with your account and land right where you belong — your dashboard, your console, your workspace.</p>
           <a href="index.php" class="btn-login-card">Sign In</a>
         </div>
