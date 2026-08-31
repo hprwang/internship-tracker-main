@@ -225,6 +225,9 @@ $db = Database::getConnection();
         <button class="nav-item" onclick="window.location.href='companies.php'">
           <span class="icon"><i class="fas fa-building"></i></span> Companies
         </button>
+        <button class="nav-item" onclick="window.location.href='settings.php'">
+          <span class="icon"><i class="fas fa-cog"></i></span> Settings
+        </button>
       </nav>
 
       <div class="sidebar-footer">

@@ -21,6 +21,7 @@ switch ($action) {
     case 'document_upload':    documentUpload($user, $db);    break;
     case 'document_delete':    documentDelete($user, $db);    break;
     case 'toggle_2fa':         toggle2FA($user, $db);         break;
+    case 'prefs_save':         prefsSave($user, $db);         break;
     default:                   jsonResponse(false, 'Unknown action: ' . $action);
 }
 
@@ -148,6 +149,27 @@ function documentDelete(array $user, PDO $db): void {
     } catch (Exception $e) {
         error_log('document_delete: ' . $e->getMessage());
         jsonResponse(false, 'Failed to remove document.');
+    }
+}
+
+function prefsSave(array $user, PDO $db): void {
+    // Standalone action so the Settings page can update ONLY notification_prefs
+    // (calling profile_save with partial fields would null out profile columns).
+    if (!verifyCSRF($_POST['csrf_token'] ?? '')) jsonResponse(false, 'Invalid request token.');
+    $prefs = [
+        'email'      => !empty($_POST['notify_email']) ? 1 : 0,
+        'interview'  => !empty($_POST['notify_interview']) ? 1 : 0,
+        'deadlines'  => !empty($_POST['notify_deadlines']) ? 1 : 0,
+        'weekly'     => !empty($_POST['notify_weekly']) ? 1 : 0,
+    ];
+    try {
+        $db->prepare("UPDATE users SET notification_prefs = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+           ->execute([json_encode($prefs, JSON_UNESCAPED_UNICODE), $user['id']]);
+        logActivity((int)$user['id'], 'prefs_save');
+        jsonResponse(true, 'Notification preferences saved.');
+    } catch (Exception $e) {
+        error_log('prefs_save: ' . $e->getMessage());
+        jsonResponse(false, 'Failed to save preferences.');
     }
 }
 

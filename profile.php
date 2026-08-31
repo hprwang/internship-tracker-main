@@ -34,8 +34,6 @@ try {
 $skills          = json_decode((string)($user['skills'] ?? '[]'), true) ?: [];
 $skills          = is_array($skills) ? $skills : [];
 $internshipTypes = array_values(array_filter(array_map('trim', explode(',', (string)($user['internship_type'] ?? '')))));
-$notifPrefs      = json_decode((string)($user['notification_prefs'] ?? '{}'), true) ?: [];
-$twofa           = (int)($user['twofa_enabled'] ?? 0);
 $docs            = [];
 try {
     $stmt = Database::getConnection()->prepare("SELECT id, kind, original_name, file_size, uploaded_at FROM profile_documents WHERE student_id = ? ORDER BY uploaded_at DESC");
@@ -242,28 +240,6 @@ function profileField(array $u, string $label, string $name, string $placeholder
     .achievement-delete:hover { border-color: rgba(239,68,68,0.4); color: #F87171; background: rgba(239,68,68,0.08); }
     .achievement-save:hover { border-color: var(--green-neon); color: var(--green-neon); background: rgba(34,197,94,0.08); }
 
-    /* Settings */
-    .settings-list { display: flex; flex-direction: column; gap: 0.5rem; }
-    .settings-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: var(--bg-panel); border-radius: 12px; cursor: pointer; transition: all 0.2s; gap: 1rem; }
-    .settings-item:hover { background: var(--border-subtle); }
-    .settings-left { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
-    .settings-icon { font-size: 1.2rem; }
-    .settings-text h4 { font-size: 0.9rem; font-weight: 500; }
-    .settings-text p { font-size: 0.8rem; color: var(--text-muted); }
-    .toggle { width: 44px; height: 24px; background: var(--border-subtle); border-radius: 12px; position: relative; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
-    .toggle.active { background: var(--green-neon); }
-    .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: all 0.2s; }
-    .toggle.active::after { left: 22px; }
-
-    .status-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 20px; }
-    .status-badge.on { background: rgba(34,197,94,0.15); color: var(--green-neon); border: 1px solid rgba(34,197,94,0.35); }
-    .status-badge.off { background: rgba(239,68,68,0.1); color: #F87171; border: 1px solid rgba(239,68,68,0.3); }
-
-    .security-btn { padding: 0.55rem 1.1rem; background: transparent; border: 1px solid rgba(34,197,94,0.5); border-radius: 8px; color: var(--green-neon); font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
-    .security-btn:hover { background: rgba(34,197,94,0.1); box-shadow: 0 0 14px rgba(34,197,94,0.2); }
-    .security-btn.danger { border-color: rgba(239,68,68,0.5); color: #F87171; }
-    .security-btn.danger:hover { background: rgba(239,68,68,0.1); box-shadow: 0 0 14px rgba(239,68,68,0.2); }
-
     /* Empty message */
     .empty-message { text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem; }
 
@@ -275,25 +251,6 @@ function profileField(array $u, string $label, string $name, string $placeholder
     .card-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); gap: 1rem; }
     .card-title { font-size: 1rem; font-weight: 700; }
     .card-body { padding: 1.25rem 1.5rem; }
-
-    /* Change Password Modal */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-    .modal-overlay.open { display: flex; }
-    .modal-overlay .modal { width: 100%; max-width: 440px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
-    .modal-overlay .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); }
-    .modal-overlay .modal-header h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); }
-    .modal-overlay .modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1; }
-    .modal-overlay .modal-close:hover { color: #F87171; }
-    .modal-overlay .modal-body { padding: 1.5rem; }
-    .modal-overlay .modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1.25rem 1.5rem; border-top: 1px solid var(--border-subtle); }
-    .modal-overlay .form-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: none; letter-spacing: normal; }
-    .modal-overlay .form-control { width: 100%; padding: 0.75rem 1rem; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.9rem; font-family: inherit; transition: all 0.2s; }
-    .modal-overlay .form-control:focus { outline: none; border-color: var(--green-neon); box-shadow: 0 0 0 3px rgba(34,197,94,0.15); }
-    .modal-overlay .form-control::placeholder { color: var(--text-muted); }
-    .modal-overlay .btn-primary { background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); color: var(--bg-deep); font-weight: 700; border: none; box-shadow: none; }
-    .modal-overlay .btn-primary:hover { background: linear-gradient(135deg, var(--green-emerald), var(--green-neon)); color: var(--bg-deep); box-shadow: 0 0 25px rgba(34,197,94,0.5); transform: translateY(-2px); }
-    .modal-overlay .btn-secondary { background: var(--bg-panel); border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 0.75rem 1.5rem; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; font-size: 0.9rem; box-shadow: none; }
-    .modal-overlay .btn-secondary:hover { border-color: var(--green-neon); color: var(--green-neon); }
 
     .toast-container { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.75rem; }
     .toast { padding: 1rem 1.5rem; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; animation: slideIn .3s ease; min-width: 250px; }
@@ -344,6 +301,9 @@ function profileField(array $u, string $label, string $name, string $placeholder
         </button>
         <button class="nav-item" onclick="window.location.href='companies.php'">
           <span class="icon"><i class="fas fa-building"></i></span> Companies
+        </button>
+        <button class="nav-item" onclick="window.location.href='settings.php'">
+          <span class="icon"><i class="fas fa-cog"></i></span> Settings
         </button>
       </nav>
       <div class="sidebar-footer">
@@ -550,104 +510,9 @@ function profileField(array $u, string $label, string $name, string $placeholder
             </div>
           </div>
 
-          <!-- Notification Settings -->
-          <div class="info-card">
-            <div class="card-header">
-              <h3 class="card-title"><i class="fas fa-bell" style="color:#FBBF24;"></i> Notification Settings</h3>
-            </div>
-            <div class="card-body">
-              <div class="settings-list">
-                <?php
-                  $nt = [
-                    ['name' => 'notify_email', 'icon' => 'envelope', 'title' => 'Email Notifications', 'desc' => 'Receive updates via email', 'key' => 'email'],
-                    ['name' => 'notify_interview', 'icon' => 'crosshairs', 'title' => 'Interview Reminders', 'desc' => '24 hours before interviews', 'key' => 'interview'],
-                    ['name' => 'notify_deadlines', 'icon' => 'clock', 'title' => 'Application Deadlines', 'desc' => 'Reminder before closing', 'key' => 'deadlines'],
-                    ['name' => 'notify_weekly', 'icon' => 'chart-bar', 'title' => 'Weekly Reports', 'desc' => 'Progress summary', 'key' => 'weekly'],
-                  ];
-                  foreach ($nt as $row):
-                    $checked = isset($notifPrefs[$row['key']]) ? (int)$notifPrefs[$row['key']] === 1 : $row['name'] !== 'notify_weekly';
-                ?>
-                <div class="settings-item">
-                  <div class="settings-left">
-                    <span class="settings-icon"><i class="fas fa-<?= $row['icon'] ?>"></i></span>
-                    <div class="settings-text">
-                      <h4><?= e($row['title']) ?></h4>
-                      <p><?= e($row['desc']) ?></p>
-                    </div>
-                  </div>
-                  <input type="checkbox" name="<?= e($row['name']) ?>" id="<?= e($row['name']) ?>" <?= $checked ? 'checked' : '' ?> style="display:none">
-                  <label class="toggle <?= $checked ? 'active' : '' ?>" for="<?= e($row['name']) ?>" onclick="togglePref(this)"></label>
-                </div>
-                <?php endforeach; ?>
-              </div>
-            </div>
-          </div>
-
-          <!-- Account Settings -->
-          <div class="info-card full-width">
-            <div class="card-header">
-              <h3 class="card-title"><i class="fas fa-lock"></i> Account Settings</h3>
-            </div>
-            <div class="card-body">
-              <div class="settings-list">
-                <div class="settings-item" onclick="openChangePasswordModal()">
-                  <div class="settings-left">
-                    <span class="settings-icon"><i class="fas fa-key"></i></span>
-                    <div class="settings-text">
-                      <h4>Change Password</h4>
-                      <p>Update your account password</p>
-                    </div>
-                  </div>
-                  <button type="button" class="security-btn">Change Password</button>
-                </div>
-                <div class="settings-item">
-                  <div class="settings-left">
-                    <span class="settings-icon"><i class="fas fa-shield-alt"></i></span>
-                    <div class="settings-text">
-                      <h4>Two-Factor Authentication</h4>
-                      <p>Add an extra layer of security</p>
-                    </div>
-                    <span class="status-badge <?= $twofa ? 'on' : 'off' ?>" id="2fa-badge"><?= $twofa ? 'Enabled' : 'Not Enabled' ?></span>
-                  </div>
-                  <button type="button" class="security-btn <?= $twofa ? 'danger' : '' ?>" id="2fa-btn" onclick="toggle2FA()"><?= $twofa ? 'Disable' : 'Enable' ?></button>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </form>
     </main>
-  </div>
-
-  <!-- Change Password Modal -->
-  <div class="modal-overlay" id="change-password-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2>Change Password</h2>
-        <button type="button" class="modal-close" onclick="closeChangePasswordModal()" aria-label="Close">&times;</button>
-      </div>
-      <form id="change-password-form">
-        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-        <div class="modal-body">
-          <div class="form-group" style="margin-bottom:1rem">
-            <label class="form-label">Current Password</label>
-            <input type="password" name="current_password" class="form-control" placeholder="Enter current password" required>
-          </div>
-          <div class="form-group" style="margin-bottom:1rem">
-            <label class="form-label">New Password</label>
-            <input type="password" name="new_password" class="form-control" placeholder="Min. 8 chars, 1 uppercase, 1 number" required>
-          </div>
-          <div class="form-group" style="margin-bottom:1rem">
-            <label class="form-label">Confirm New Password</label>
-            <input type="password" name="confirm_password" class="form-control" placeholder="Confirm new password" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-secondary" onclick="closeChangePasswordModal()">Cancel</button>
-          <button type="submit" id="change-password-submit" class="btn btn-primary">Update Password</button>
-        </div>
-      </form>
-    </div>
   </div>
 </body>
 </html>
@@ -695,14 +560,6 @@ function profileField(array $u, string $label, string $name, string $placeholder
   function removeSkill(i) {
     skills.splice(i, 1);
     renderSkills();
-  }
-
-  function togglePref(toggleEl) {
-    var id = toggleEl.getAttribute('for');
-    var cb = document.getElementById(id);
-    var checked = !toggleEl.classList.contains('active');
-    toggleEl.classList.toggle('active', checked);
-    if (cb) cb.checked = checked;
   }
 
   async function saveProfile(e) {
@@ -823,44 +680,6 @@ function profileField(array $u, string $label, string $name, string $placeholder
     }
   }
 
-  async function toggle2FA() {
-    var btn = document.getElementById('2fa-btn');
-    btn.disabled = true;
-    var fd = new FormData();
-    fd.append('action', 'toggle_2fa');
-    fd.append('csrf_token', App.csrfToken);
-    try {
-      var res = await fetch('php/profile.php', { method: 'POST', body: fd });
-      var data = await res.json();
-      if (data.success) {
-        var badge = document.getElementById('2fa-badge');
-        var on = data.twofa_enabled === 1 || data.twofa_enabled === '1';
-        badge.className = 'status-badge ' + (on ? 'on' : 'off');
-        badge.textContent = on ? 'Enabled' : 'Not Enabled';
-        btn.className = 'security-btn ' + (on ? 'danger' : '');
-        btn.textContent = on ? 'Disable' : 'Enable';
-        toast(data.message, 'success');
-      } else {
-        toast(data.message || 'Failed to update security settings.', 'error');
-      }
-    } catch (err) {
-      toast('Network error. Please try again.', 'error');
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  // Chip/toggle handlers
-  document.querySelectorAll('.toggle').forEach(function (toggle) {
-    if (!toggle.getAttribute('onclick')) {
-      toggle.addEventListener('click', function () {
-        this.classList.toggle('active');
-        var checkbox = document.getElementById(this.getAttribute('for')) || this.previousElementSibling;
-        if (checkbox && checkbox.type === 'checkbox') checkbox.checked = this.classList.contains('active');
-      });
-    }
-  });
-
   // Achievement add functionality
   function esc(value) {
     var div = document.createElement('div');
@@ -940,45 +759,6 @@ function profileField(array $u, string $label, string $name, string $placeholder
       })
       .catch(err => console.error('Load achievements error:', err));
   }
-
-  // Change Password Modal
-  function openChangePasswordModal() {
-    var modal = document.getElementById('change-password-modal');
-    if (modal) { modal.classList.add('open'); document.body.style.overflow = 'hidden'; }
-  }
-  function closeChangePasswordModal() {
-    var modal = document.getElementById('change-password-modal');
-    if (modal) { modal.classList.remove('open'); document.body.style.overflow = ''; }
-  }
-  document.getElementById('change-password-modal').addEventListener('click', function (e) {
-    if (e.target === this) closeChangePasswordModal();
-  });
-
-  document.getElementById('change-password-form').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    var form = e.target;
-    var btn = document.getElementById('change-password-submit');
-    var currentPassword = form.current_password.value;
-    var newPassword = form.new_password.value;
-    var confirmPassword = form.confirm_password.value;
-    if (newPassword.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
-    if (!/[A-Z]/.test(newPassword)) { toast('Password must contain at least one uppercase letter', 'error'); return; }
-    if (!/[0-9]/.test(newPassword)) { toast('Password must contain at least one number', 'error'); return; }
-    if (newPassword !== confirmPassword) { toast('Passwords do not match', 'error'); return; }
-    btn.disabled = true;
-    btn.textContent = 'Updating...';
-    try {
-      var res = await fetch('php/auth.php?action=change_password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ csrf_token: form.csrf_token.value, current_password: currentPassword, new_password: newPassword }).toString()
-      });
-      var data = await res.json();
-      if (data.success) { toast('Password updated successfully!', 'success'); closeChangePasswordModal(); form.reset(); }
-      else { toast(data.message || 'Failed to update password', 'error'); }
-    } catch (err) { toast('Network error. Please try again.', 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Update Password'; }
-  });
 
   renderSkills();
 </script>
