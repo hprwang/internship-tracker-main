@@ -200,7 +200,7 @@ if (!function_exists('prefChecked')) {
         <div class="logo-icon"><i class="fas fa-clipboard-list"></i></div>
         <div class="logo-text">Intern<span>Track</span></div>
       </div>
-      <div class="nav-label">Main Navigation</div>
+      <div class="nav-label">Dashboard</div>
       <nav class="nav-menu">
         <button class="nav-item" onclick="window.location.href='dashboard.php'">
           <span class="icon"><i class="fas fa-chart-pie"></i></span> Dashboard
@@ -217,6 +217,7 @@ if (!function_exists('prefChecked')) {
         <button class="nav-item" onclick="window.location.href='companies.php'">
           <span class="icon"><i class="fas fa-building"></i></span> Companies
         </button>
+        <div class="nav-label" style="margin-top: 1.75rem;">System</div>
         <button class="nav-item active" onclick="window.location.href='settings.php'">
           <span class="icon"><i class="fas fa-cog"></i></span> Settings
         </button>
