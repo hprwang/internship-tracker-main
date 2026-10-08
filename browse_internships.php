@@ -117,6 +117,12 @@ $csrf = generateCSRF();
     .status-badge-cell.under_review { background: rgba(59,130,246,0.12); color: #60A5FA; }
     .status-badge-cell.accepted { background: rgba(34,197,94,0.12); color: var(--green-neon); }
     .status-badge-cell.rejected { background: rgba(239,68,68,0.12); color: #F87171; }
+    .status-badge-cell.applied { background: rgba(245,158,11,0.12); color: #FBBF24; }
+    .status-badge-cell.interview { background: rgba(59,130,246,0.12); color: #60A5FA; }
+    .status-badge-cell.ongoing { background: rgba(168,85,247,0.12); color: #A78BFA; }
+    .status-badge-cell.completed { background: rgba(34,197,94,0.2); color: var(--green-neon); }
+    .status-badge-cell.withdrawn { background: rgba(161,161,170,0.12); color: #A1A1AA; }
+    .own-tag { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); border: 1px solid var(--border-subtle); vertical-align: middle; }
     .status-badge-cell .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
     /* Modal */
@@ -228,10 +234,9 @@ $csrf = generateCSRF();
 
       <div id="tab-apps-panel" style="display:none;">
         <div class="table-container">
-          <table class="data-table">
+          <table class="data-table" data-no-bulk>
             <thead>
               <tr>
-                <th><span class="animated-checkbox" role="checkbox" tabindex="0" id="check-all-header"></span></th>
                 <th>Internship</th>
                 <th>Company</th>
                 <th>Location</th>
@@ -245,7 +250,7 @@ $csrf = generateCSRF();
                 <td colspan="6" class="empty-state">
                   <div class="empty-icon"><i class="fas fa-inbox"></i></div>
                   <h3 class="empty-title">No applications yet</h3>
-                  <p class="empty-text">Browse open internships and apply to see your applications here.</p>
+                  <p class="empty-text">Browse open internships and apply, or add your own internship, to see it here.</p>
                 </td>
               </tr>
             </tbody>
@@ -463,10 +468,10 @@ $csrf = generateCSRF();
       if (allApplications.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" class="empty-state">
+            <td colspan="6" class="empty-state">
               <div class="empty-icon"><i class="fas fa-inbox"></i></div>
               <h3 class="empty-title">No applications yet</h3>
-              <p class="empty-text">Browse open internships and apply to see your applications here.</p>
+              <p class="empty-text">Browse open internships and apply, or add your own internship, to see it here.</p>
             </td>
           </tr>`;
         return;
@@ -478,8 +483,7 @@ $csrf = generateCSRF();
         const date = app.applied_at ? new Date(app.applied_at).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' }) : '—';
         return `
         <tr>
-          <td><span class="animated-checkbox" role="checkbox" tabindex="0" data-app-id="${app.id}"></span></td>
-          <td><strong>${escapeHtml(app.internship_title)}</strong></td>
+          <td><strong>${escapeHtml(app.internship_title)}</strong>${app.source === 'tracked' ? '<span class="own-tag" title="Added by you from Dashboard / Progress Logs">Added by me</span>' : ''}</td>
           <td>${escapeHtml(app.company_name)}</td>
           <td>${escapeHtml(app.internship_location || '—')}</td>
           <td>${stipendDisplay}</td>

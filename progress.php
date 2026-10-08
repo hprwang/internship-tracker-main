@@ -119,6 +119,13 @@ $db = Database::getConnection();
 
     .select-group select:focus { outline: none; border-color: var(--green-neon); }
 
+    .select-row { display: flex; gap: 0.75rem; align-items: stretch; }
+    .select-row select { flex: 1; min-width: 0; }
+    .delete-intern-btn { padding: 0.75rem 1.25rem; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; background: rgba(239,68,68,0.08); color: #F87171; border: 1px solid rgba(239,68,68,0.3); transition: all var(--transition); }
+    .delete-intern-btn:disabled { opacity: 0.55; cursor: not-allowed; background: var(--bg-panel); color: var(--text-muted); border-color: var(--border-subtle); }
+    .delete-intern-btn:disabled:hover { background: var(--bg-panel); color: var(--text-muted); border-color: var(--border-subtle); }
+    .delete-intern-btn:hover:not(:disabled) { background: rgba(239,68,68,0.15); border-color: #F87171; color: #fff; }
+
     /* Table */
     .table-wrapper { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden; }
 
@@ -281,9 +288,12 @@ $db = Database::getConnection();
       <div class="select-section">
         <div class="select-group">
           <label>Select Internship</label>
-          <select id="internship-select" onchange="loadLogs()">
-            <option value="">Choose an internship...</option>
-          </select>
+          <div class="select-row">
+            <select id="internship-select" onchange="loadLogs()">
+              <option value="">Choose an internship...</option>
+            </select>
+            <button type="button" class="delete-intern-btn" id="delete-intern-btn" onclick="deleteSelectedInternship()" title="Delete the selected internship and its logs"><i class="fas fa-trash"></i> Delete Internship</button>
+          </div>
         </div>
       </div>
 
@@ -566,7 +576,7 @@ $db = Database::getConnection();
     let filteredLogs = [];
     let currentViewId = null;
 
-    async function loadInternships() {
+    async function loadInternships(silentEmpty) {
       try {
         const res = await fetch('php/internships.php', {
           method: 'POST',
@@ -582,7 +592,9 @@ $db = Database::getConnection();
           select.innerHTML = '<option value="">Select an internship...</option>';
           if (allInternships.length === 0) {
             select.innerHTML += '<option value="">No internships found</option>';
-            toast('No internships found. Browse internships to apply and get started.', 'error');
+            select.value = '';
+            if (!silentEmpty) toast('No internships found. Browse internships to apply and get started.', 'error');
+            loadLogs();
           } else {
             allInternships.forEach(int => {
               const opt = document.createElement('option');
@@ -598,7 +610,20 @@ $db = Database::getConnection();
       } catch (e) { console.error('Load internships error:', e); toast('Failed to load internships: ' + e.message, 'error'); }
     }
 
+    // Internships an admin accepted/assigned can only be deleted by an admin.
+    function syncInternshipDeleteButton() {
+      const btn = document.getElementById('delete-intern-btn');
+      if (!btn) return;
+      const id = document.getElementById('internship-select').value;
+      const item = allInternships.find(i => String(i.id) === String(id));
+      const locked = !!(item && item.admin_managed);
+      btn.disabled = !id || locked;
+      btn.innerHTML = locked ? '<i class="fas fa-lock"></i> Admin managed' : '<i class="fas fa-trash"></i> Delete Internship';
+      btn.title = locked ? 'Accepted or assigned by an admin — only an admin can delete it' : 'Delete the selected internship and its logs';
+    }
+
     async function loadLogs() {
+      syncInternshipDeleteButton();
       const internshipId = document.getElementById('internship-select').value;
       const list = document.getElementById('log-list');
 
@@ -616,6 +641,9 @@ $db = Database::getConnection();
         document.getElementById('stat-weeks').textContent = '0';
         document.getElementById('stat-hours').textContent = '0';
         document.getElementById('stat-rating').textContent = '-';
+        allLogs = [];
+        filteredLogs = [];
+        document.getElementById('logs-ui').style.display = 'none';
         return;
       }
 
@@ -778,6 +806,31 @@ $db = Database::getConnection();
       deleteLog(currentViewId);
       document.getElementById('view-modal').classList.remove('open');
     }
+    async function deleteSelectedInternship() {
+      const id = document.getElementById('internship-select').value;
+      if (!id) { toast('Select an internship to delete first.', 'error'); return; }
+      const item = allInternships.find(i => String(i.id) === String(id));
+      if (item && item.admin_managed) { toast('This internship was accepted or assigned by an admin, so only an admin can delete it.', 'error'); return; }
+      const name = item ? item.title + ' at ' + item.company_name : 'this internship';
+      if (!confirm('Delete "' + name + '"?\n\nAll of its progress logs will be deleted too. This cannot be undone.')) return;
+      try {
+        const res = await fetch('php/internships.php', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: new URLSearchParams({ action: 'delete', id, csrf_token: App.csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast('Internship deleted.', 'success');
+          loadInternships(true);
+        } else {
+          toast(data.message || 'Failed to delete internship', 'error');
+        }
+      } catch (e) {
+        toast('Failed to delete internship', 'error');
+      }
+    }
+
     async function deleteLog(id) {
       if (!confirm('Delete this progress log? This cannot be undone.')) return;
       try {

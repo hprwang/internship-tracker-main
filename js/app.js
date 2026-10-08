@@ -283,10 +283,12 @@ function renderInternshipTable(list) {
       <td>${escapeHtml(r.end_date)}</td>
       <td>${r.stipend > 0 ? 'NPR '+Number(r.stipend).toLocaleString() : '—'}</td>
       <td>
-        <div style="display:flex;gap:.4rem">
+        ${r.admin_managed
+          ? '<span style="color:var(--text-muted,#71717A)">—</span>'
+          : `<div style="display:flex;gap:.4rem">
           <button class="btn btn-secondary btn-sm" onclick="editInternship(${Number(r.id)})">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteInternship(${Number(r.id)})">Del</button>
-        </div>
+        </div>`}
       </td>
     </tr>`).join('');
 }
@@ -313,6 +315,11 @@ function openAddInternship() {
 }
 
 async function editInternship(id) {
+  const known = (App.internships || []).find(i => Number(i.id) === Number(id));
+  if (known && known.admin_managed) {
+    toast('This internship was accepted or assigned by an admin, so only an admin can edit it.', 'error');
+    return;
+  }
   try {
     const res = await api(`php/internships.php?action=get&id=${id}`, null, 'GET');
     if (!res.success) return toast(res.message, 'error');
@@ -349,6 +356,11 @@ async function saveInternship() {
 }
 
 async function deleteInternship(id) {
+  const known = (App.internships || []).find(i => Number(i.id) === Number(id));
+  if (known && known.admin_managed) {
+    toast('This internship was accepted or assigned by an admin, so only an admin can delete it.', 'error');
+    return;
+  }
   if (!confirm('Delete this internship? This cannot be undone.')) return;
   try {
     const res = await api('php/internships.php', { action: 'delete', id });

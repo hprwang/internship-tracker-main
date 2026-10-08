@@ -970,6 +970,11 @@ $dashboardData = json_encode(
                   <div class="bar-fill" id="bar-fill-rejected" style="height:8px;"></div>
                   <div class="bar-label">Rejected</div>
                 </div>
+                <div class="bar-item">
+                  <div class="bar-value" id="bar-withdrawn">0</div>
+                  <div class="bar-fill" id="bar-fill-withdrawn" style="height:8px;"></div>
+                  <div class="bar-label">Withdrawn</div>
+                </div>
               </div>
             </div>
           </div>
@@ -1310,6 +1315,11 @@ $dashboardData = json_encode(
     color: #F87171;
     border: 1px solid rgba(239,68,68,0.3);
   }
+  .status-badge.withdrawn {
+    background: rgba(161,161,170,0.15);
+    color: #A1A1AA;
+    border: 1px solid rgba(161,161,170,0.3);
+  }
   .status-badge.under_review {
     background: rgba(96,165,250,0.15);
     color: #60A5FA;
@@ -1341,6 +1351,7 @@ $dashboardData = json_encode(
   .activity-icon.accept { background: rgba(34,197,94,0.15); }
   .activity-icon.complete { background: rgba(34,197,94,0.2); }
   .activity-icon.reject { background: rgba(239,68,68,0.15); }
+  .activity-icon.withdraw { background: rgba(161,161,170,0.15); }
   .activity-content { flex: 1; min-width: 0; }
   .activity-title {
     font-size: 0.85rem;
@@ -1415,6 +1426,7 @@ var dashboardData = <?= $dashboardData ?>;
   var dashStatsUrl = (dashInPhpFolder ? '' : 'php/') + 'internships.php?action=dashboard';
   var refreshTimer = null;
   var isFetching = false;
+  var refreshQueued = false;
 
   // Renders the KPI cards, bar chart, recent applications table, activity
   // list and upcoming interviews from a dashboard data object. Called on
@@ -1433,7 +1445,7 @@ var dashboardData = <?= $dashboardData ?>;
     // Update bar chart
     var total = data.total || 1;
     var maxBar = 100;
-    var statuses = ['applied', 'interview', 'accepted', 'ongoing', 'completed', 'rejected'];
+    var statuses = ['applied', 'interview', 'accepted', 'ongoing', 'completed', 'rejected', 'withdrawn'];
     statuses.forEach(function(status) {
       var count = data.byStatus[status] || 0;
       var el = document.getElementById('bar-' + status);
@@ -1470,7 +1482,8 @@ var dashboardData = <?= $dashboardData ?>;
       accepted: { icon: '&#10004;', cls: 'accept' },
       ongoing: { icon: '&#9889;', cls: 'complete' },
       completed: { icon: '&#9989;', cls: 'complete' },
-      rejected: { icon: '&#10008;', cls: 'reject' }
+      rejected: { icon: '&#10008;', cls: 'reject' },
+      withdrawn: { icon: '&#8630;', cls: 'withdraw' }
     };
     if (activityContainer) {
       if (data.recent && data.recent.length > 0) {
@@ -1548,12 +1561,14 @@ var dashboardData = <?= $dashboardData ?>;
   // calls loadDashboard() after saving/editing/deleting an internship — plus
   // the polling below — actually refreshes what's on screen.
   window.loadDashboard = async function loadDashboard() {
-    if (isFetching) return;
+    // If a refresh is already running, queue one more for when it finishes so a
+    // change made mid-fetch (e.g. deleting an internship) is never missed.
+    if (isFetching) { refreshQueued = true; return; }
     isFetching = true;
     var liveEl = document.getElementById('dash-live-status');
     if (liveEl) liveEl.classList.add('syncing');
     try {
-      var res = await fetch(dashStatsUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      var res = await fetch(dashStatsUrl, { cache: 'no-store', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       var payload = await res.json();
       if (payload && payload.success) {
         renderDashboardData(payload);
@@ -1563,6 +1578,7 @@ var dashboardData = <?= $dashboardData ?>;
     } finally {
       isFetching = false;
       if (liveEl) liveEl.classList.remove('syncing');
+      if (refreshQueued) { refreshQueued = false; window.loadDashboard(); }
     }
   };
 

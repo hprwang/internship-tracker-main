@@ -671,156 +671,6 @@ function studentAnalyticsData(int $userId): array {
  * upcoming interviews). Shared by the initial server render in dashboard.php
  * and the AJAX refresh endpoint so both always return identical data.
  */
-/**
- * Which of these internships were put in the student's tracker by an ADMIN
- * rather than added by the student themselves? Returns a set: [id => true].
- *
- * A student may only remove internships they added manually. These two kinds
- * belong to the admin side and only an admin may delete them:
- *   1. an internship matching an ACCEPTED application of the same student
- *      (company + title) — admin.php auto-creates this when it accepts one;
- *   2. an internship an admin created for the student (activity_log shows
- *      'add_internship' / 'auto_add_internship').
- * Only positively identified rows are locked: anything we can't prove an admin
- * created stays deletable by its owner.
- */
-function adminManagedInternshipIds(PDO $db, array $ids): array {
-    $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
-    if (!$ids) return [];
-    $in = implode(',', array_fill(0, count($ids), '?'));
-    $managed = [];
-
-    $queries = [
-        "SELECT DISTINCT i.id
-           FROM internships i
-           JOIN applications a ON a.student_id = i.student_id AND a.status = 'accepted'
-           JOIN company_internships ci ON ci.id = a.company_internship_id
-                AND ci.company_id = i.company_id
-                AND LOWER(TRIM(ci.title)) = LOWER(TRIM(i.title))
-          WHERE i.id IN ($in)",
-        "SELECT DISTINCT i.id
-           FROM internships i
-           JOIN activity_log l ON l.entity_id = i.id AND l.entity_type = 'internships'
-                AND l.action IN ('add_internship', 'auto_add_internship')
-          WHERE i.id IN ($in)",
-    ];
-    foreach ($queries as $sql) {
-        try {
-            $st = $db->prepare($sql);
-            $st->execute($ids);
-            foreach ($st->fetchAll() as $row) $managed[(int)$row['id']] = true;
-        } catch (Exception $e) {
-            error_log('adminManagedInternshipIds: ' . $e->getMessage());
-        }
-    }
-    return $managed;
-}
-
-/**
- * Everything a student is tracking, as ONE list with no double counting.
- *
- * Two tables feed it:
- *   - internships   : internships the student added themselves, plus the copy
- *                     that php/admin.php auto-creates when an application is
- *                     accepted (so Progress Logs can use it).
- *   - applications  : applications submitted through Browse Internships.
- *
- * An ACCEPTED application and its auto-created internships row are the same
- * internship, so they are merged into a single item (matched on company +
- * title, the same test admin.php uses when it creates the copy). An accepted
- * application is represented only through that row — so when the student
- * deletes the internship, it disappears from every count and list instead of
- * lingering as an orphaned "accepted" application.
- *
- * Each item: source ('application'|'tracked'), id, internship_title,
- * company_name, internship_location, stipend, applied_at, status (what to show)
- * and count_status (applied/interview/accepted/ongoing/completed/rejected/withdrawn).
- */
-function studentTrackedItems(PDO $db, int $userId): array {
-    $norm = function ($title): string {
-        $t = trim((string)$title);
-        return function_exists('mb_strtolower') ? mb_strtolower($t) : strtolower($t);
-    };
-    $key = fn($companyId, $title): string => (int)$companyId . '|' . $norm($title);
-
-    $appStmt = $db->prepare("
-        SELECT a.id, a.status, a.applied_at, a.company_internship_id, ci.company_id, ci.title AS internship_title,
-               ci.location AS internship_location, ci.stipend, c.name AS company_name
-        FROM applications a
-        JOIN company_internships ci ON a.company_internship_id = ci.id
-        JOIN companies c ON ci.company_id = c.id
-        WHERE a.student_id = ?
-    ");
-    $appStmt->execute([$userId]);
-    $apps = $appStmt->fetchAll();
-
-    $intStmt = $db->prepare("
-        SELECT i.id, i.company_id, i.title AS internship_title, i.status, i.stipend,
-               i.work_mode, i.created_at AS applied_at,
-               c.name AS company_name, c.location AS company_location
-        FROM internships i
-        JOIN companies c ON i.company_id = c.id
-        WHERE i.student_id = ?
-    ");
-    $intStmt->execute([$userId]);
-    $ints = $intStmt->fetchAll();
-
-    // company|title -> index in $ints
-    $intByKey = [];
-    foreach ($ints as $idx => $r) {
-        $k = $key($r['company_id'], $r['internship_title']);
-        if (!isset($intByKey[$k])) $intByKey[$k] = $idx;
-    }
-
-    $items = [];
-    $merged = [];   // indexes of $ints already represented by an accepted application
-
-    foreach ($apps as $a) {
-        if ($a['status'] === 'accepted') {
-            $k = $key($a['company_id'], $a['internship_title']);
-            if (!isset($intByKey[$k]) || isset($merged[$intByKey[$k]])) {
-                continue; // no tracker entry (deleted) -> not counted or shown
-            }
-            $idx = $intByKey[$k];
-            $merged[$idx] = true;
-            $live = $ints[$idx]['status']; // the student's live status (accepted -> ongoing -> completed...)
-            $items[] = [
-                'source' => 'application', 'id' => (int)$a['id'],
-                'company_internship_id' => (int)$a['company_internship_id'],
-                'internship_title' => $a['internship_title'], 'company_name' => $a['company_name'],
-                'internship_location' => $a['internship_location'],
-                'stipend' => (float)($a['stipend'] ?? 0), 'applied_at' => $a['applied_at'],
-                'status' => $live, 'count_status' => $live,
-            ];
-            continue;
-        }
-        $items[] = [
-            'source' => 'application', 'id' => (int)$a['id'],
-            'company_internship_id' => (int)$a['company_internship_id'],
-            'internship_title' => $a['internship_title'], 'company_name' => $a['company_name'],
-            'internship_location' => $a['internship_location'],
-            'stipend' => (float)($a['stipend'] ?? 0), 'applied_at' => $a['applied_at'],
-            'status' => $a['status'],
-            'count_status' => $a['status'] === 'rejected' ? 'rejected' : 'applied', // pending / under_review
-        ];
-    }
-
-    foreach ($ints as $idx => $r) {
-        if (isset($merged[$idx])) continue;
-        $loc = trim((string)($r['company_location'] ?? ''));
-        $items[] = [
-            'source' => 'tracked', 'id' => (int)$r['id'],
-            'internship_title' => $r['internship_title'], 'company_name' => $r['company_name'],
-            'internship_location' => $loc !== '' ? $loc : ucfirst((string)$r['work_mode']),
-            'stipend' => (float)($r['stipend'] ?? 0), 'applied_at' => $r['applied_at'],
-            'status' => $r['status'], 'count_status' => $r['status'],
-        ];
-    }
-
-    usort($items, fn($x, $y) => strcmp((string)($y['applied_at'] ?? ''), (string)($x['applied_at'] ?? '')));
-    return $items;
-}
-
 function studentDashboardData(int $userId): array {
     $db = Database::getConnection();
     $total = 0;
@@ -830,6 +680,12 @@ function studentDashboardData(int $userId): array {
     $myApplications = [];
 
     try {
+        $statusStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM internships WHERE student_id = ? GROUP BY status");
+        $statusStmt->execute([$userId]);
+        while ($row = $statusStmt->fetch()) {
+            $byStatus[$row['status']] = (int)$row['cnt'];
+        }
+
         $recentStmt = $db->prepare("
             SELECT i.title, i.status, i.start_date, c.name as company_name
             FROM internships i
@@ -850,27 +706,39 @@ function studentDashboardData(int $userId): array {
         $interviewStmt->execute([$userId]);
         $interviews = $interviewStmt->fetchAll();
 
-        // One merged list (see studentTrackedItems) drives every number, so an
-        // accepted application and its auto-created internship count once, and
-        // anything the student adds or deletes is reflected immediately.
-        $items = studentTrackedItems($db, $userId);
-        $total = count($items);
-        $byStatus = array_fill_keys(['applied', 'interview', 'accepted', 'ongoing', 'completed', 'rejected', 'withdrawn'], 0);
-        foreach ($items as $it) {
-            $byStatus[$it['count_status']] = ($byStatus[$it['count_status']] ?? 0) + 1;
+        // Applications submitted through Browse Internships (job-board postings
+        // published by companies) — a separate table from the student's own
+        // manually-tracked internships above, so it needs its own query.
+        $appsStmt = $db->prepare("
+            SELECT a.id, a.status, a.applied_at, ci.title AS internship_title,
+                   ci.location AS internship_location, ci.stipend, c.name AS company_name
+            FROM applications a
+            JOIN company_internships ci ON a.company_internship_id = ci.id
+            JOIN companies c ON ci.company_id = c.id
+            WHERE a.student_id = ?
+            ORDER BY a.applied_at DESC LIMIT 5
+        ");
+        $appsStmt->execute([$userId]);
+        $myApplications = $appsStmt->fetchAll();
+
+        // Counts come from BOTH sources and are added together:
+        //   1. internships the student adds themselves (any of the 7 statuses)
+        //   2. applications submitted through Browse Internships
+        //      (pending/under_review count as "applied")
+        // $byStatus already holds source 1 from the first query above.
+        $appStatusStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM applications WHERE student_id = ? GROUP BY status");
+        $appStatusStmt->execute([$userId]);
+        $appByStatus = [];
+        while ($row = $appStatusStmt->fetch()) {
+            $appByStatus[$row['status']] = (int)$row['cnt'];
         }
 
-        // "My Applications" card: the browse-and-apply submissions only.
-        foreach ($items as $it) {
-            if ($it['source'] !== 'application') continue;
-            $myApplications[] = [
-                'id' => $it['id'], 'status' => $it['status'], 'applied_at' => $it['applied_at'],
-                'internship_title' => $it['internship_title'],
-                'internship_location' => $it['internship_location'],
-                'stipend' => $it['stipend'], 'company_name' => $it['company_name'],
-            ];
-            if (count($myApplications) >= 5) break;
-        }
+        $byStatus['applied']  = ($byStatus['applied']  ?? 0) + ($appByStatus['pending'] ?? 0) + ($appByStatus['under_review'] ?? 0);
+        $byStatus['accepted'] = ($byStatus['accepted'] ?? 0) + ($appByStatus['accepted'] ?? 0);
+        $byStatus['rejected'] = ($byStatus['rejected'] ?? 0) + ($appByStatus['rejected'] ?? 0);
+
+        // Total Applications = every tracked internship + every submitted application.
+        $total = array_sum($byStatus);
     } catch (Exception $e) {
         error_log("Dashboard data error: " . $e->getMessage());
     }

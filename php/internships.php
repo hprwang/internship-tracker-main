@@ -62,7 +62,17 @@ function getInternships(array $user, PDO $db): void {
         ORDER BY i.created_at DESC
     ");
     $stmt->execute($params);
-    jsonResponse(true, '', ['internships' => $stmt->fetchAll()]);
+    $rows = $stmt->fetchAll();
+
+    // Flag internships an admin accepted/assigned: the UI hides Delete for these
+    // and the server refuses the delete (see deleteInternship).
+    $managed = adminManagedInternshipIds($db, array_column($rows, 'id'));
+    foreach ($rows as &$row) {
+        $row['admin_managed'] = isset($managed[(int)$row['id']]);
+    }
+    unset($row);
+
+    jsonResponse(true, '', ['internships' => $rows]);
 }
 
 // ── GET SINGLE ────────────────────────────────────────────────────────────────
@@ -98,6 +108,7 @@ function getInternship(array $user, PDO $db): void {
         $data = $stmt->fetch();
     }
     if (!$data) jsonResponse(false, 'Internship not found.');
+    $data['admin_managed'] = isset(adminManagedInternshipIds($db, [(int)$data['id']])[(int)$data['id']]);
     jsonResponse(true, '', ['internship' => $data]);
 }
 
@@ -224,6 +235,13 @@ function updateInternship(array $user, PDO $db): void {
         if (!$check->fetch()) jsonResponse(false, 'Access denied.');
     }
 
+    // Students may only edit internships they added themselves. One that an
+    // admin accepted or assigned can only be edited by an admin.
+    $isAdminUser = in_array($user['role'] ?? '', ['admin', 'super_admin'], true);
+    if (!$isAdminUser && isset(adminManagedInternshipIds($db, [$id])[$id])) {
+        jsonResponse(false, 'This internship was accepted or assigned by an admin, so only an admin can edit it.');
+    }
+
     // Date sanity + status whitelist (ISO Y-m-d strings compare lexicographically).
     if ($_POST['end_date'] < $_POST['start_date']) {
         jsonResponse(false, 'End date cannot be before start date.');
@@ -279,10 +297,17 @@ function deleteInternship(array $user, PDO $db): void {
     $id = (int)($_POST['id'] ?? 0);
     if (!$id) jsonResponse(false, 'Invalid ID.');
 
-    if ($user['role'] !== 'admin') {
+    $isAdminUser = in_array($user['role'] ?? '', ['admin', 'super_admin'], true);
+    if (!$isAdminUser) {
         $check = $db->prepare("SELECT id FROM internships WHERE id = ? AND student_id = ?");
         $check->execute([$id, $user['id']]);
         if (!$check->fetch()) jsonResponse(false, 'Access denied.');
+
+        // Students may only remove internships they added themselves. One that
+        // an admin accepted or assigned can only be deleted by an admin.
+        if (isset(adminManagedInternshipIds($db, [$id])[$id])) {
+            jsonResponse(false, 'This internship was accepted or assigned by an admin, so only an admin can delete it.');
+        }
     }
 
     // Unlink stored documents before deleting the record.
@@ -571,12 +596,14 @@ function browseCompanyInternships(array $user): void {
     $db = Database::getConnection();
 
     // Company internships the current student has already applied to
+    // An accepted application whose internship an admin later removed no longer
+    // counts as applied, so the student can apply to it again.
     $applied = [];
     try {
-        $aStmt = $db->prepare("SELECT company_internship_id FROM applications WHERE student_id = ?");
-        $aStmt->execute([(int)$user['id']]);
-        while ($row = $aStmt->fetch()) {
-            $applied[(int)$row['company_internship_id']] = true;
+        foreach (studentTrackedItems($db, (int)$user['id']) as $it) {
+            if ($it['source'] === 'application' && !empty($it['company_internship_id'])) {
+                $applied[(int)$it['company_internship_id']] = true;
+            }
         }
     } catch (Exception $e) {
         error_log("browseCompanyInternships applied query failed: " . $e->getMessage());
@@ -617,10 +644,22 @@ function applyToCompanyInternship(array $user): void {
     $stmt->execute([$internshipId]);
     if (!$stmt->fetch()) jsonResponse(false, 'Internship not found or no longer accepting applications.');
 
-    // Prevent duplicate applications
-    $dup = $db->prepare("SELECT id FROM applications WHERE company_internship_id = ? AND student_id = ?");
+    // Prevent duplicate applications — but if an earlier ACCEPTED application's
+    // internship was removed by an admin, the student may apply again. That old
+    // row is reused (reset to pending) so there is still one row per student
+    // and posting.
+    $dup = $db->prepare("SELECT id FROM applications WHERE company_internship_id = ? AND student_id = ? ORDER BY id DESC");
     $dup->execute([$internshipId, (int)$user['id']]);
-    if ($dup->fetch()) jsonResponse(false, 'You have already applied to this internship.');
+    $existingIds = $dup->fetchAll();
+    $reuseId = 0;
+    if ($existingIds) {
+        foreach (studentTrackedItems($db, (int)$user['id']) as $it) {
+            if ($it['source'] === 'application' && (int)($it['company_internship_id'] ?? 0) === $internshipId) {
+                jsonResponse(false, 'You have already applied to this internship.');
+            }
+        }
+        $reuseId = (int)$existingIds[0]['id'];
+    }
 
     // Optional resume upload (PDF/DOC/DOCX)
     $resumePath = '';
@@ -632,16 +671,25 @@ function applyToCompanyInternship(array $user): void {
     }
 
     try {
-        $ins = $db->prepare("
-            INSERT INTO applications (company_internship_id, student_id, cover_letter, resume, status)
-            VALUES (?, ?, ?, ?, 'pending')
-        ");
-        $ins->execute([
-            $internshipId,
-            (int)$user['id'],
-            $coverLetter,
-            $resumePath,
-        ]);
+        if ($reuseId) {
+            $upd = $db->prepare("
+                UPDATE applications
+                SET status = 'pending', cover_letter = ?, resume = ?, notes = NULL, applied_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND student_id = ?
+            ");
+            $upd->execute([$coverLetter, $resumePath, $reuseId, (int)$user['id']]);
+        } else {
+            $ins = $db->prepare("
+                INSERT INTO applications (company_internship_id, student_id, cover_letter, resume, status)
+                VALUES (?, ?, ?, ?, 'pending')
+            ");
+            $ins->execute([
+                $internshipId,
+                (int)$user['id'],
+                $coverLetter,
+                $resumePath,
+            ]);
+        }
         logActivity((int)$user['id'], 'company_apply', 'company_internship', $internshipId);
         jsonResponse(true, 'Application submitted! The company will review it shortly.');
     } catch (Exception $e) {
@@ -653,22 +701,10 @@ function applyToCompanyInternship(array $user): void {
 function getMyApplications(array $user): void {
     $db = Database::getConnection();
 
-    $stmt = $db->prepare("
-        SELECT a.*, ci.title AS internship_title, ci.location AS internship_location,
-               ci.stipend, c.name AS company_name
-        FROM applications a
-        JOIN company_internships ci ON a.company_internship_id = ci.id
-        JOIN companies c ON ci.company_id = c.id
-        WHERE a.student_id = ?
-        ORDER BY a.applied_at DESC
-    ");
-    $stmt->execute([(int)$user['id']]);
-    $apps = $stmt->fetchAll();
+    // Same merged list the dashboard counts from: browse-and-apply applications
+    // plus the student's own internships, with an accepted application and its
+    // auto-created internship shown once.
+    $items = studentTrackedItems($db, (int)$user['id']);
 
-    foreach ($apps as &$app) {
-        $app['stipend'] = (float)($app['stipend'] ?? 0);
-    }
-    unset($app);
-
-    jsonResponse(true, '', ['applications' => $apps]);
+    jsonResponse(true, '', ['applications' => $items]);
 }
