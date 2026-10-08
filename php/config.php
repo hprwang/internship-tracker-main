@@ -568,6 +568,38 @@ function handleUpload(array $file, string $subdir): ?string {
 /**
  * In-app notification helpers
  */
+/**
+ * Return a user's decoded notification preferences (JSON from `users.notification_prefs`).
+ * e.g. ["email" => 1, "interview" => 0, "deadlines" => 0, "weekly" => 0]
+ */
+function getNotificationPrefs(PDO $db, int $userId): array {
+    $stmt = $db->prepare("SELECT notification_prefs FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch();
+
+    // Default ON for everything except weekly reports (matches `prefChecked`
+    // in settings.php), so new users keep receiving notifications unless they
+    // explicitly turn a channel off in their notification preferences.
+    $defaults = ['email' => 1, 'interview' => 1, 'deadlines' => 1, 'weekly' => 0];
+
+    if (!$row || empty($row['notification_prefs'])) {
+        return $defaults;
+    }
+
+    $prefs = json_decode((string)$row['notification_prefs'], true);
+    if (!is_array($prefs)) {
+        return $defaults;
+    }
+
+    $normalized = [];
+    foreach ($defaults as $key => $value) {
+        $normalized[$key] = isset($prefs[$key]) ? (int)$prefs[$key] : $value;
+    }
+
+    return $normalized;
+}
+
+
 function notify(int $userId, string $title, string $message, string $type = 'info', bool $email = false): void {
     try {
         $db = Database::getConnection();
@@ -578,7 +610,14 @@ function notify(int $userId, string $title, string $message, string $type = 'inf
         error_log('notify(): ' . $e->getMessage());
         return;
     }
-    if ($email && defined('SMTP_USERNAME') && SMTP_USERNAME !== '') {
+    // Email is sent only when explicitly requested AND the recipient student
+    // has enabled "Email Notifications" in their notification preferences.
+    $prefs = getNotificationPrefs($db, $userId);
+    $sendEmail = $email
+        && defined('SMTP_USERNAME') && SMTP_USERNAME !== ''
+        && ($prefs['email'] ?? 0) === 1;
+
+    if ($sendEmail) {
         try {
             $stmt = $db->prepare("SELECT email, full_name FROM users WHERE id = ?");
             $stmt->execute([$userId]);
@@ -641,10 +680,6 @@ function studentDashboardData(int $userId): array {
     $myApplications = [];
 
     try {
-        $totalStmt = $db->prepare("SELECT COUNT(*) FROM internships WHERE student_id = ?");
-        $totalStmt->execute([$userId]);
-        $total = (int)$totalStmt->fetchColumn();
-
         $statusStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM internships WHERE student_id = ? GROUP BY status");
         $statusStmt->execute([$userId]);
         while ($row = $statusStmt->fetch()) {
@@ -686,15 +721,10 @@ function studentDashboardData(int $userId): array {
         $appsStmt->execute([$userId]);
         $myApplications = $appsStmt->fetchAll();
 
-        // Fold browse-and-apply application counts into the same KPI/status
-        // totals as the manually-tracked internships above, so "Total
-        // Applications" and the Status Breakdown chart reflect everything
-        // the student has applied to, not just one of the two tables.
-        //   pending, under_review -> "applied" (still waiting to hear back)
-        //   accepted              -> "accepted"
-        //   rejected              -> "rejected"
-        // (applications has no ongoing/completed equivalent — those only
-        // exist once a student is tracking the internship itself.)
+        // Application statuses (applied/accepted/rejected) come from the
+        // browse-and-apply applications table; manually-tracked internships
+        // contribute the "interview", "ongoing" and "completed" statuses,
+        // which have no browse-apply equivalent.
         $appStatusStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM applications WHERE student_id = ? GROUP BY status");
         $appStatusStmt->execute([$userId]);
         $appByStatus = [];
@@ -702,11 +732,14 @@ function studentDashboardData(int $userId): array {
             $appByStatus[$row['status']] = (int)$row['cnt'];
         }
 
-        $appTotal = array_sum($appByStatus);
-        $total += $appTotal;
-        $byStatus['applied']  = ($byStatus['applied']  ?? 0) + ($appByStatus['pending'] ?? 0) + ($appByStatus['under_review'] ?? 0);
-        $byStatus['accepted'] = ($byStatus['accepted'] ?? 0) + ($appByStatus['accepted'] ?? 0);
-        $byStatus['rejected'] = ($byStatus['rejected'] ?? 0) + ($appByStatus['rejected'] ?? 0);
+        // "Total Applications" and the application statuses (applied/accepted/rejected)
+        // come from the browse-and-apply applications table. The manually-tracked
+        // internships (above) contribute the "interview", "ongoing" and "completed"
+        // statuses, which are rendered in the KPI cards and bars below.
+        $total = array_sum($appByStatus);
+        $byStatus['applied']  = ($appByStatus['pending'] ?? 0) + ($appByStatus['under_review'] ?? 0);
+        $byStatus['accepted'] = $appByStatus['accepted'] ?? 0;
+        $byStatus['rejected'] = $appByStatus['rejected'] ?? 0;
     } catch (Exception $e) {
         error_log("Dashboard data error: " . $e->getMessage());
     }

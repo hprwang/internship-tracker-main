@@ -292,11 +292,15 @@ switch ($action) {
             }
 
             if ($prev && $prev['student_id'] && $prev['status'] !== $status) {
+                // $email = true triggers an email to the student in addition to
+                // the in-app notification above. sendMail() falls back gracefully
+                // if SMTP is not configured (see config.php sendMail()).
                 notify(
                     (int)$prev['student_id'],
                     'Application status updated',
                     "Your application for \"{$prev['title']}\" is now " . str_replace('_', ' ', $status) . '.',
-                    'info'
+                    'info',
+                    true
                 );
             }
             echo json_encode(['success' => true, 'message' => 'Status updated.']);
