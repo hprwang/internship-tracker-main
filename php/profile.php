@@ -81,14 +81,9 @@ function profileSave(array $user, PDO $db): void {
         $params[] = implode(',', $type);
     }
 
-    $prefs = [
-        'email'      => !empty($_POST['notify_email']) ? 1 : 0,
-        'interview'  => !empty($_POST['notify_interview']) ? 1 : 0,
-        'deadlines'  => !empty($_POST['notify_deadlines']) ? 1 : 0,
-        'weekly'     => !empty($_POST['notify_weekly']) ? 1 : 0,
-    ];
-    $fields[] = "`notification_prefs` = ?";
-    $params[] = json_encode($prefs, JSON_UNESCAPED_UNICODE);
+    // NOTE: notification_prefs is intentionally NOT written here. The profile
+    // form has no notify_* inputs, so rebuilding prefs from $_POST would reset
+    // every toggle to 0. Preferences are saved only by prefsSave() below.
 
     $fields[] = "`updated_at` = CURRENT_TIMESTAMP";
     $params[] = $user['id'];

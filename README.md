@@ -263,6 +263,27 @@ Reports generated in `./reports/`:
 
 ---
 
+## ⏰ Scheduled reminders
+
+`php/send_reminders.php` sends interview reminders, application-deadline
+reminders and (optionally) weekly progress reports, honoring each student's
+**Settings → Notification Preferences**. It is CLI-only and safe to run more
+than once a day (duplicates are skipped).
+
+```bash
+php php/send_reminders.php --dry-run   # preview, sends nothing
+php php/send_reminders.php             # interview + deadline reminders
+php php/send_reminders.php --weekly    # ...plus weekly reports
+```
+
+Schedule it once a day — Linux/macOS cron: `0 8 * * * php /path/to/php/send_reminders.php`;
+on XAMPP/Windows use Task Scheduler with `C:\xampp\php\php.exe` and the
+script path (add `--weekly` to a separate weekly task, e.g. Mondays).
+Emails are only sent when the student's **Email Notifications** toggle is on
+and SMTP credentials are configured; the in-app notification is always created.
+
+---
+
 ## 📄 License
 
 MIT — free to use and modify.

@@ -603,19 +603,21 @@ function getNotificationPrefs(PDO $db, int $userId): array {
 function notify(int $userId, string $title, string $message, string $type = 'info', bool $email = false): void {
     try {
         $db = Database::getConnection();
-        $channel = $email ? 'both' : 'in_app';
+        // Check the user's "Email Notifications" preference BEFORE inserting so the
+        // stored channel reflects what will actually happen ('both' only if an
+        // email is both requested and allowed).
+        $prefs = getNotificationPrefs($db, $userId);
+        $emailAllowed = $email && ($prefs['email'] ?? 0) === 1;
+        $channel = $emailAllowed ? 'both' : 'in_app';
         $stmt = $db->prepare("INSERT INTO notifications (user_id, title, message, type, channel) VALUES (?,?,?,?,?)");
         $stmt->execute([$userId, $title, $message, $type, $channel]);
     } catch (Throwable $e) {
         error_log('notify(): ' . $e->getMessage());
         return;
     }
-    // Email is sent only when explicitly requested AND the recipient student
-    // has enabled "Email Notifications" in their notification preferences.
-    $prefs = getNotificationPrefs($db, $userId);
-    $sendEmail = $email
-        && defined('SMTP_USERNAME') && SMTP_USERNAME !== ''
-        && ($prefs['email'] ?? 0) === 1;
+
+    $sendEmail = $emailAllowed
+        && defined('SMTP_USERNAME') && SMTP_USERNAME !== '';
 
     if ($sendEmail) {
         try {
